@@ -13,12 +13,16 @@ authors = [{ name = "Alex Laird", email = "contact@alexlaird.com" }]
 maintainers = [{ name = "Alex Laird", email = "contact@alexlaird.com" }]
 requires-python = ">=3.9"
 dependencies = [
+    "click>=7.1",
     "requests>=2.23",
     "beautifulsoup4>=4.14",
     "PyYAML>=6.0.3",
+    "Pillow>=9.0.1",
+    "pyotp>=2.9",
 ]
 classifiers = [
-    "Development Status :: 1 - Planning",
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
     "Intended Audience :: Developers",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
@@ -27,11 +31,40 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Topic :: Internet :: WWW/HTTP :: Browsers",
+    "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 
 [project.optional-dependencies]
+browser = [
+    "playwright>=1.47.0",
+]
+capsolver = [
+    "capsolver",
+]
+anticaptcha = [
+    "anticaptchaofficial",
+]
+2captcha = [
+    "2captcha-python",
+]
 lxml = [
     "lxml",
+]
+captcha = [
+    "amazoncaptcha>=0.4",
+]
+docs = [
+    "Sphinx",
+    "sphinx-notfound-page",
+    "sphinx_autodoc_typehints",
+    "mypy",
+    "types-requests",
+    "types-Pillow",
+    "types-PyYAML",
+    "sphinx-sitemap",
+    "sphinxext-opengraph",
+    "furo",
 ]
 dev = [
     "pytest",
@@ -42,7 +75,12 @@ dev = [
     "mypy",
     "types-requests",
     "types-PyYAML",
+    "types-Pillow",
+    "responses",
 ]
+
+[project.scripts]
+amazon-auth = "amazonauth.cli:amazon_auth_cli"
 
 [project.urls]
 Changelog = "https://github.com/alexdlaird/amazon-auth/blob/main/CHANGELOG.md"
@@ -111,3 +149,19 @@ warn_unreachable = true
 warn_unused_configs = true
 strict_equality = true
 enable_error_code = ["ignore-without-code", "redundant-expr", "redundant-self", "truthy-bool", "unused-awaitable"]
+
+[[tool.mypy.overrides]]
+module = "amazoncaptcha.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "capsolver.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "twocaptcha.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "anticaptchaofficial.*"
+ignore_missing_imports = true

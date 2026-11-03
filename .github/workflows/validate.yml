@@ -25,9 +25,24 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: "3.12"
+      - name: Install jpeg
+        run: sudo apt-get install -y libjpeg-dev zlib1g-dev
       - name: Build test coverage
         run: make install test
       - name: Check code
         run: make check
       - name: Validate package
         run: make local
+      - name: Upload test coverage
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@v6
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          directory: ./build/coverage
+      - name: Upload test results
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@v6
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          directory: ./build/test-results
+          report_type: test_results

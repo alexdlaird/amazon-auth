@@ -25,9 +25,9 @@ class Selector:
 
 class SelectorsFromText:
     """
-    Builds a selector, or a list of selectors, from page text attributes of the :class:`AuthSelectors` class it's set
-    on, so a subclass that changes the text gets selectors that match it. Selectors built from the same text are
-    shared.
+    Builds a selector, or a list of selectors, from page text attributes of the
+    :class:`~amazonauth.selectors.AuthSelectors` class it's set on, so a subclass that changes the text gets
+    selectors that match it. Selectors built from the same text are shared.
 
     .. code-block:: python
 
@@ -41,7 +41,7 @@ class SelectorsFromText:
                  *attribute_names: str) -> None:
         #: Builds the selector(s), given the values of :attr:`attribute_names`.
         self.build: Callable[..., Any] = build
-        #: The names of the :class:`AuthSelectors` attributes the selector(s) are built from.
+        #: The names of the :class:`~amazonauth.selectors.AuthSelectors` attributes the selector(s) are built from.
         self.attribute_names: Tuple[str, ...] = attribute_names
         self._built: Dict[Tuple[Any, ...], Any] = {}
 

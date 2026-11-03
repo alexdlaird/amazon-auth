@@ -53,6 +53,10 @@ class AuthConstants:
                             "openid.ns": "http://specs.openid.net/auth/2.0"}
     SIGN_IN_CLAIM_URL = f"{BASE_URL}/ax/claim"
     SIGN_OUT_URL = f"{BASE_URL}/gp/flex/sign-out.html"
+    #: A page only a signed-in session can load, which
+    #: :func:`~amazonauth.session.AmazonSession.check_session` requests to ask Amazon whether it still accepts
+    #: the session.
+    SESSION_CHECK_URL = f"{BASE_URL}/your-orders/orders"
 
     ##########################################################################
     # Headers
@@ -195,6 +199,7 @@ class AuthConstants:
         self.SIGN_IN_QUERY_PARAMS = sign_in_query_params
         self.SIGN_IN_CLAIM_URL = f"{base_url}/ax/claim"
         self.SIGN_OUT_URL = f"{base_url}/gp/flex/sign-out.html"
+        self.SESSION_CHECK_URL = f"{base_url}/your-orders/orders"
 
         headers = dict(vars(self).get("BASE_HEADERS", type(self).BASE_HEADERS))
         headers["Origin"] = base_url

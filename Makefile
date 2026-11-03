@@ -1,4 +1,4 @@
-.PHONY: all install nopyc clean test check local validate-release
+.PHONY: all install nopyc clean test docs check generate-region-data local validate-release
 
 SHELL := /usr/bin/env bash
 PYTHON_BIN ?= python
@@ -30,11 +30,24 @@ test: install
 		coverage run -m pytest -v && coverage report && coverage xml && coverage html; \
 	)
 
+docs: install
+	@( \
+		source $(PROJECT_VENV)/bin/activate; \
+		python -m pip install ".[docs]"; \
+		sphinx-build -M html docs build/docs -n -E; \
+	)
+
 check: install
 	@( \
 		source $(PROJECT_VENV)/bin/activate; \
 		python -m pip install ".[dev]"; \
 		mypy amazonauth && flake8; \
+	)
+
+generate-region-data: install
+	@( \
+		source $(PROJECT_VENV)/bin/activate; \
+		python scripts/generate-region-data.py; \
 	)
 
 local:

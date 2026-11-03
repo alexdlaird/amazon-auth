@@ -8,8 +8,10 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Added
 
-- `AmazonAuthConfig`, `AuthConstants`, `AuthSelectors`, the `AmazonAuthError` exceptions, region data, and `select()` / `select_one()`, moved from `amazon-orders`, which builds on them.
-- An `lxml` extra, for `bs4_parser: lxml`.
+- Sign-in, moved from `amazon-orders`, which now builds on it: `AmazonSession`, the sign-in forms, the WAF challenge solvers (`capsolver`, `anticaptcha` and `2captcha` extras), browser sign-in and challenge handling (`browser` extra), `AmazonAuthConfig`, `AuthConstants`, `AuthSelectors`, the `AmazonAuthError` exceptions, region data, and `select()` / `select_one()`.
+- The `amazon-auth` CLI, with `login` (and `login --browser`), `logout`, `check-session` and `version`.
+- A `captcha` extra, for legacy Captcha auto-solve on Python <=3.12, and an `lxml` extra, for `bs4_parser: lxml`.
+- [Documentation](https://amazon-auth.readthedocs.io).
 
 ## [0.0.2](https://github.com/alexdlaird/amazon-auth/compare/0.0.1...0.0.2) - 2026-10-21
 

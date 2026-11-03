@@ -52,6 +52,10 @@ class AmazonAuthConfig:
 
     #: The package named in messages that suggest installing something, e.g. ``pip install amazon-auth[lxml]``.
     PACKAGE_NAME: str = "amazon-auth"
+    #: The documentation that messages link to, e.g. for sign-in challenges.
+    DOCS_URL: str = "https://amazon-auth.readthedocs.io"
+    #: Where messages ask for unexpected behavior to be reported.
+    ISSUES_URL: str = "https://github.com/alexdlaird/amazon-auth/issues"
 
     def __init__(self,
                  config_path: Optional[str] = None,
