@@ -12,19 +12,102 @@ keywords = ["amazon", "auth", "sign-in", "session"]
 authors = [{ name = "Alex Laird", email = "contact@alexlaird.com" }]
 maintainers = [{ name = "Alex Laird", email = "contact@alexlaird.com" }]
 requires-python = ">=3.9"
+dependencies = [
+    "requests>=2.23",
+    "beautifulsoup4>=4.14",
+    "PyYAML>=6.0.3",
+]
 classifiers = [
     "Development Status :: 1 - Planning",
     "Intended Audience :: Developers",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+
+[project.optional-dependencies]
+lxml = [
+    "lxml",
+]
+dev = [
+    "pytest",
+    "coverage[toml]",
+    "flake8",
+    "flake8-pyproject",
+    "pep8-naming",
+    "mypy",
+    "types-requests",
+    "types-PyYAML",
 ]
 
 [project.urls]
+Changelog = "https://github.com/alexdlaird/amazon-auth/blob/main/CHANGELOG.md"
 Sponsor = "https://github.com/sponsors/alexdlaird"
 "Source Code" = "https://github.com/alexdlaird/amazon-auth"
 
 [tool.setuptools]
 package-dir = { amazonauth = "amazonauth" }
 
+[tool.setuptools.package-data]
+amazonauth = ["py.typed"]
+
 [tool.setuptools.dynamic]
 version = { attr = "amazonauth.__version__" }
+
+[tool.pytest.ini_options]
+junit_family = "legacy"
+addopts = [
+    "-s",
+    "--ignore=venv",
+    "--durations=0",
+    "--durations-min=0.5",
+    "--junitxml=build/test-results/junit.xml"
+]
+
+[tool.coverage.run]
+omit = [
+    "venv/**",
+    "scripts/**",
+    "*/tests/**"
+]
+
+[tool.coverage.report]
+precision = 2
+exclude_lines = [
+    "if TYPE_CHECKING:",
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if __name__ == .__main__.:",
+]
+
+[tool.coverage.xml]
+output = "build/coverage/coverage.xml"
+
+[tool.coverage.html]
+title = "Coverage Report"
+directory = "build/coverage"
+
+[tool.flake8]
+max-line-length = 119
+statistics = true
+exclude = "scripts/*,docs/*,venv/*,build/*,dist/*,.egg-info/*,.mypy_cache/*,.claude/*"
+
+[tool.mypy]
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+disallow_untyped_decorators = true
+disallow_subclassing_any = true
+warn_redundant_casts = true
+warn_unreachable = true
+warn_unused_configs = true
+strict_equality = true
+enable_error_code = ["ignore-without-code", "redundant-expr", "redundant-self", "truthy-bool", "unused-awaitable"]
