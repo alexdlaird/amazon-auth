@@ -1,4 +1,4 @@
-.PHONY: all local upload
+.PHONY: all local
 
 SHELL := /usr/bin/env bash
 PYTHON_BIN ?= python
@@ -13,8 +13,3 @@ local:
 		$(PYTHON_BIN) -m build; \
 	)
 
-upload: local
-	@( \
-		$(PYTHON_BIN) -m pip install --upgrade twine && \
-		$(PYTHON_BIN) -m twine upload dist/*; \
-	)
