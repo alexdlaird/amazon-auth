@@ -14,7 +14,7 @@ maintainers = [{ name = "Alex Laird", email = "contact@alexlaird.com" }]
 requires-python = ">=3.9"
 dependencies = [
     "click>=7.1",
-    "requests>=2.23",
+    "requests>=2.34.2",
     "beautifulsoup4>=4.14",
     "PyYAML>=6.0.3",
     "Pillow>=9.0.1",
