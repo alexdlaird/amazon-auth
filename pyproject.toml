@@ -52,7 +52,7 @@ lxml = [
     "lxml",
 ]
 captcha = [
-    "amazoncaptcha>=0.4",
+    "amazoncaptcha>=0.5.11",
 ]
 docs = [
     "Sphinx",
