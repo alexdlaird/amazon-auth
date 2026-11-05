@@ -1,15 +1,32 @@
 name: Release
 
+run-name: Release
+
 on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
+  actions: read
 
 jobs:
-  release:
-    name: Publish to PyPI
+  prereq:
+    uses: alexdlaird/.github/.github/workflows/release-prereq.yml@main
+    with:
+      version_file: 'amazonauth/__init__.py'
+      version_pattern: 's/^__version__ = ".*"/__version__ = "${VERSION}"/'
+      repo_slug: alexdlaird/amazon-auth
+      changelog: true
+    secrets:
+      bot_app_id: ${{ secrets.RELEASE_BOT_APP_ID }}
+      bot_private_key: ${{ secrets.RELEASE_BOT_PRIVATE_KEY }}
+
+  build:
+    needs: [prereq]
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
 
     env:
       FORCE_COLOR: 1
@@ -17,14 +34,60 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.prereq.outputs.squash_commit_sha }}
 
       - name: Set up Python 3.12
         uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
+      - name: Build package
+        run: make local
+
+      - name: Upload package
+        uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+
+  publish:
+    needs: [prereq, build]
+    runs-on: ubuntu-latest
+
+    environment:
+      name: pypi
+      url: https://pypi.org/project/amazon-auth/${{ needs.prereq.outputs.version }}
+
+    permissions:
+      id-token: write
+
+    steps:
+      - name: Download package
+        uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist/
+
       - name: Publish to PyPI
-        env:
-          TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
-          TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
-        run: make upload
+        uses: pypa/gh-action-pypi-publish@release/v1
+
+  finish:
+    needs: [prereq, publish]
+    if: always() && needs.prereq.result == 'success'
+    uses: alexdlaird/.github/.github/workflows/release-finish.yml@main
+    with:
+      shipped: ${{ needs.publish.result == 'success' }}
+      version: ${{ needs.prereq.outputs.version }}
+      squash_commit_sha: ${{ needs.prereq.outputs.squash_commit_sha }}
+      squash_boundary_sha: ${{ needs.prereq.outputs.squash_boundary_sha }}
+      build_run_id: ${{ needs.prereq.outputs.build_run_id }}
+      version_file: 'amazonauth/__init__.py'
+      version_pattern: 's/^__version__ = ".*"/__version__ = "${VERSION}"/'
+      repo_slug: alexdlaird/amazon-auth
+      github_release: true
+      github_release_notes: ${{ needs.prereq.outputs.release_notes }}
+    secrets:
+      bot_app_id: ${{ secrets.RELEASE_BOT_APP_ID }}
+      bot_private_key: ${{ secrets.RELEASE_BOT_PRIVATE_KEY }}
