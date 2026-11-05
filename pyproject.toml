@@ -15,7 +15,7 @@ requires-python = ">=3.9"
 dependencies = [
     "click>=7.1",
     "requests>=2.23",
-    "beautifulsoup4>=4.14",
+    "beautifulsoup4>=4.15.0",
     "PyYAML>=6.0.3",
     "Pillow>=9.0.1",
     "pyotp>=2.9",
