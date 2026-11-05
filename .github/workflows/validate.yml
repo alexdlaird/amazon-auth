@@ -29,6 +29,8 @@ jobs:
         run: sudo apt-get install -y libjpeg-dev zlib1g-dev
       - name: Build test coverage
         run: make install test
+      - name: Build docs
+        run: make docs
       - name: Check code
         run: make check
       - name: Validate package
