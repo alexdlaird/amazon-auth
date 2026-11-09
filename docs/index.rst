@@ -1,6 +1,30 @@
+.. rst-class:: hide-header
+
 **************************************************************
 Amazon Auth - Sign in to Amazon's consumer website from Python
 **************************************************************
+
+.. only:: html
+
+   .. image:: _static/logo-light.png
+      :alt: amazon-auth - Sign in to Amazon's consumer website from Python
+      :align: center
+      :width: 497px
+      :class: hero-logo only-light
+
+   .. image:: _static/logo-dark.png
+      :alt: amazon-auth - Sign in to Amazon's consumer website from Python
+      :align: center
+      :width: 497px
+      :class: hero-logo only-dark
+
+.. only:: not html
+
+   .. image:: _html/_images/logo.png
+      :alt: amazon-auth - Sign in to Amazon's consumer website from Python
+      :align: center
+
+|
 
 .. only:: builder_html
 

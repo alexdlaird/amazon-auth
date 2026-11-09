@@ -1,4 +1,4 @@
-# amazon-auth
+<p align="center"><img alt="amazon-auth - Sign in to Amazon's consumer website from Python" src="https://amazon-auth.readthedocs.io/_images/logo.png" /></p>
 
 [![Version](https://img.shields.io/pypi/v/amazon-auth)](https://pypi.org/project/amazon-auth)
 [![Python Versions](https://img.shields.io/pypi/pyversions/amazon-auth.svg)](https://pypi.org/project/amazon-auth)

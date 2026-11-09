@@ -75,6 +75,8 @@ sitemap_url_scheme = "{link}"
 sitemap_excludes = ["search.html", "404.html", "genindex.html", "py-modindex.html", "_modules/*"]
 
 ogp_site_url = html_baseurl
+ogp_image = f"{html_baseurl}_images/logo.png"
+ogp_image_alt = "amazon-auth - Sign in to Amazon's consumer website from Python"
 ogp_type = "website"
 ogp_social_cards = {"enable": False}
 ogp_enable_meta_description = False
@@ -97,6 +99,9 @@ html_theme_options = {
     "source_repository": "https://github.com/alexdlaird/amazon-auth/",
     "source_branch": "main",
     "source_directory": "docs/",
+    "light_logo": "logo-light.png",
+    "dark_logo": "logo-dark.png",
+    "sidebar_hide_name": True,
     "top_of_page_buttons": ["edit"],
     "footer_icons": [
         {
@@ -116,6 +121,7 @@ html_theme_options = {
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ["_static"]
+html_extra_path = ["_html"]
 
 html_css_files = [
     "custom.css",
