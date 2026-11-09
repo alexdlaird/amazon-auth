@@ -6,6 +6,7 @@ from typing import Dict, Optional
 from urllib.parse import urlencode, urlparse
 
 from amazonauth.conf import AmazonAuthConfig
+from amazonauth.exception import AmazonAuthError
 from amazonauth.region_data import REGION_SITES
 
 logger = logging.getLogger(__name__)
@@ -173,10 +174,10 @@ class AuthConstants:
         Override the URL-derived attributes for the given Amazon domain, and the values that depend on which Amazon
         site it is, from its region data: the sign-in ``openid.assoc_handle`` (Amazon rejects a sign-in, with HTTP 404,
         whose handle doesn't match the site), ``Accept-Language``, and
-        ``COOKIES_SET_WHEN_AUTHENTICATED``. Each is applied only when a subclass hasn't overridden it, and a site that
-        isn't known keeps the defaults.
+        ``COOKIES_SET_WHEN_AUTHENTICATED``. Each is applied only when a subclass hasn't overridden it.
 
         :param domain: The Amazon domain (e.g. ``amazon.com.au``) or full URL (e.g. ``https://www.amazon.com.au``).
+        :raises AmazonAuthError: If the domain isn't an Amazon site in the region data, over ``https``.
         """
         base_url = self._normalize_base_url(domain)
         tld = self._tld(base_url)
@@ -244,11 +245,33 @@ class AuthConstants:
             host = host[len("www."):]
         return host[len("amazon."):] if host.startswith("amazon.") else ""
 
-    @staticmethod
-    def _normalize_base_url(value: str) -> str:
-        value = value.strip().rstrip("/")
+    @classmethod
+    def _normalize_base_url(cls,
+                            domain: str) -> str:
+        """
+        The base URL for an Amazon domain or full URL. Only Amazon's own sites, in the region data and over ``https``,
+        are accepted, so sign-in never sends credentials to another host, whether through a typo or a value a
+        downstream passed along.
+
+        :param domain: The Amazon domain (e.g. ``amazon.com.au``) or full URL (e.g. ``https://www.amazon.com.au``).
+        :return: The base URL.
+        :raises AmazonAuthError: If the domain isn't an Amazon site in the region data, over ``https``.
+        """
+        value = domain.strip().rstrip("/")
         if value.startswith(("http://", "https://")):
-            return value
-        if value.startswith("www."):
-            return f"https://{value}"
-        return f"https://www.{value}"
+            base_url = value
+        elif value.startswith("www."):
+            base_url = f"https://{value}"
+        else:
+            base_url = f"https://www.{value}"
+
+        parsed = urlparse(base_url)
+        host = (parsed.hostname or "").removeprefix("www.")
+        if (parsed.scheme == "https" and host.startswith("amazon.") and cls._tld(base_url) in REGION_SITES and
+                not (parsed.port or parsed.username or parsed.password or parsed.path or parsed.params or
+                     parsed.query or parsed.fragment)):
+            return base_url
+
+        supported_sites = ", ".join(f"amazon.{tld}" for tld in sorted(REGION_SITES))
+        raise AmazonAuthError(f"The domain \"{domain}\" isn't an Amazon site. Use one of {supported_sites}, as "
+                              f"amazon.<site> or https://www.amazon.<site>.")

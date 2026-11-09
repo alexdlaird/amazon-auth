@@ -348,9 +348,7 @@ class AmazonAuthConfig:
         Persist the current state of this config object to the config file.
         """
         with config_file_lock:
-            os.makedirs(os.path.dirname(self.config_path), exist_ok=True)
+            util.make_private_dirs(os.path.dirname(self.config_path))
 
-            with open(self.config_path, "w") as config_file:
-                logger.debug(f"Saving config to {self.config_path} ...")
-
-                yaml.dump(self._data, config_file)
+            logger.debug(f"Saving config to {self.config_path} ...")
+            util.write_private_file(self.config_path, yaml.dump(self._data))

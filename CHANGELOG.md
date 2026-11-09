@@ -4,7 +4,20 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased](https://github.com/alexdlaird/amazon-auth/compare/0.2.1...HEAD)
+## [Unreleased](https://github.com/alexdlaird/amazon-auth/compare/0.2.2...HEAD)
+
+## [0.2.2](https://github.com/alexdlaird/amazon-auth/compare/0.2.1...0.2.2) - 2026-11-09
+
+### Added
+
+- [Building on `amazon-auth`](https://amazon-auth.readthedocs.io/downstream.html), for packages that extend its config, session, constants, selectors and CLI.
+
+### Security
+
+- `domain` must be an Amazon site over `https`, so credentials can't be sent to a mistyped or look-alike host.
+- Redirects are never followed to `http://` or to re-send request data to another site, and drop `Origin` and `Referer` when they leave the site.
+- Cookies from signing in with a browser keep `secure` and their expiry.
+- The config file and `debug` output are only readable by the current user.
 
 ## [0.2.1](https://github.com/alexdlaird/amazon-auth/compare/0.2.0...0.2.1) - 2026-11-09
 

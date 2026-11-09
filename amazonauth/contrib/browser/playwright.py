@@ -25,7 +25,7 @@ from amazonauth.exception import (
     AmazonAuthWafSolverError,
 )
 from amazonauth.forms import AuthForm
-from amazonauth.util import AmazonSessionResponse, has_display
+from amazonauth.util import AmazonSessionResponse, has_display, make_private_dirs, write_private_file
 
 if TYPE_CHECKING:
     from amazonauth.contrib.waf.base import AwsWafForm
@@ -37,6 +37,17 @@ BODY_TEXT_LENGTH_JS = "() => (document.body && document.body.innerText || '').le
 SIGN_IN_POLL_INTERVAL_MS = 2000
 SIGN_IN_SETTLE_MS = 2000
 SIGN_IN_PREFILL_TIMEOUT_MS = 5000
+
+
+def _jar_cookie_attributes(pw_cookie: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    The attributes of a browser cookie, as the session's cookie jar takes them. ``secure`` is kept, so a cookie only
+    sent over ``https`` in the browser is only sent over ``https`` by the session too.
+    """
+    expires = pw_cookie.get("expires", -1)
+    return {"domain": pw_cookie.get("domain"), "path": pw_cookie.get("path", "/"),
+            "secure": bool(pw_cookie.get("secure", False)),
+            "expires": int(expires) if expires and expires > 0 else None}
 
 
 class PlaywrightBrowserLauncher:
@@ -338,6 +349,8 @@ class PlaywrightAuthForm(AuthForm):
                 "value": cookie.value or "",
                 "domain": cookie.domain or domain,
                 "path": cookie.path or "/",
+                "secure": bool(cookie.secure),
+                "expires": cookie.expires if cookie.expires else -1,
             })
         if playwright_cookies:
             context.add_cookies(playwright_cookies)
@@ -346,21 +359,18 @@ class PlaywrightAuthForm(AuthForm):
         if not self.amazon_session:
             return  # pragma: no cover
         for pw_cookie in context.cookies():
-            self.amazon_session.session.cookies.set(
-                pw_cookie["name"],
-                pw_cookie["value"],
-                domain=pw_cookie.get("domain"),
-                path=pw_cookie.get("path", "/"),
-            )
+            self.amazon_session.session.cookies.set(pw_cookie["name"], pw_cookie["value"],
+                                                    **_jar_cookie_attributes(pw_cookie))
 
     def _save_debug_snapshot(self, page: Any, output_dir: Optional[str], name: str) -> None:
         if not output_dir:
             return
         try:
-            os.makedirs(output_dir, exist_ok=True)
-            page.screenshot(path=os.path.join(output_dir, f"{name}.png"))
-            with open(os.path.join(output_dir, f"{name}.html"), "w", encoding="utf-8") as f:
-                f.write(page.content())
+            make_private_dirs(output_dir)
+            screenshot_path = os.path.join(output_dir, f"{name}.png")
+            page.screenshot(path=screenshot_path)
+            os.chmod(screenshot_path, 0o600)
+            write_private_file(os.path.join(output_dir, f"{name}.html"), page.content())
             logger.debug(f"Debug snapshot saved: {name} (url={page.url})")
         except Exception:
             logger.debug(f"Debug snapshot failed to save: {name}", exc_info=True)
@@ -975,7 +985,7 @@ class PlaywrightBrowserLogin:
         cookie_jar = self.amazon_session.session.cookies
         cookie_jar.clear()
         for cookie in self._amazon_cookies(context.cookies()):
-            cookie_jar.set(cookie["name"], cookie["value"], domain=cookie["domain"], path=cookie.get("path", "/"))
+            cookie_jar.set(cookie["name"], cookie["value"], **_jar_cookie_attributes(cookie))
 
     def _verify_session(self) -> None:
         try:

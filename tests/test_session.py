@@ -496,6 +496,91 @@ class TestSession(UnitTestCase):
 
     @unittest.skipIf(sys.platform == "win32", reason="Windows does not support POSIX file permissions")
     @responses.activate
+    def test_debug_page_and_output_dir_are_owner_only(self):
+        # GIVEN
+        amazon_session = AmazonSession("some-username@gmail.com", "some-password", debug=True,
+                                       config=self.test_config)
+        responses.add(responses.GET, f"{self.test_config.constants.BASE_URL}/some/page",
+                      body="<html><body>debug page</body></html>", status=200)
+
+        # WHEN
+        amazon_session.get(f"{self.test_config.constants.BASE_URL}/some/page")
+
+        # THEN
+        self.assertEqual(0o700, os.stat(self.test_output_dir).st_mode & 0o777)
+        page_name = os.listdir(self.test_output_dir)[0]
+        self.assertEqual(0o600, os.stat(os.path.join(self.test_output_dir, page_name)).st_mode & 0o777)
+
+    @responses.activate
+    def test_redirect_to_http_is_refused(self):
+        # GIVEN
+        amazon_session = AmazonSession(config=self.test_config)
+        amazon_session.session.cookies.set("at-main", "auth-token-value", domain=".amazon.com", path="/")
+        responses.add(responses.GET, "https://www.amazon.com/some/page", status=302,
+                      headers={"Location": "http://www.amazon.com/other/page"})
+        insecure_response = responses.add(responses.GET, "http://www.amazon.com/other/page", body="insecure")
+
+        # WHEN
+        with self.assertRaises(AmazonAuthError) as cm:
+            amazon_session.get("https://www.amazon.com/some/page")
+
+        # THEN
+        self.assertIn("which isn't over https", str(cm.exception))
+        self.assertEqual(0, insecure_response.call_count)
+
+    @responses.activate
+    def test_redirect_resending_data_to_another_site_is_refused(self):
+        # GIVEN
+        amazon_session = AmazonSession(config=self.test_config)
+        responses.add(responses.POST, "https://www.amazon.com/ap/signin", status=307,
+                      headers={"Location": "https://other.example/collect"})
+        other_site_response = responses.add(responses.POST, "https://other.example/collect", body="collected")
+
+        # WHEN
+        with self.assertRaises(AmazonAuthError) as cm:
+            amazon_session.post("https://www.amazon.com/ap/signin", data={"password": "some-password"})
+
+        # THEN
+        self.assertIn("would send the request's data to another site", str(cm.exception))
+        self.assertEqual(0, other_site_response.call_count)
+
+    @responses.activate
+    def test_redirect_to_another_site_drops_origin_referer_and_cookies(self):
+        # GIVEN
+        amazon_session = AmazonSession(config=self.test_config)
+        amazon_session.session.cookies.set("at-main", "auth-token-value", domain=".amazon.com", path="/")
+        responses.add(responses.GET, "https://www.amazon.com/some/invoice", status=302,
+                      headers={"Location": "https://files.example/invoice.pdf"})
+        other_site_response = responses.add(responses.GET, "https://files.example/invoice.pdf", body=b"%PDF")
+
+        # WHEN
+        amazon_session.get("https://www.amazon.com/some/invoice", binary=True)
+
+        # THEN
+        request = other_site_response.calls[0].request
+        self.assertNotIn("Origin", request.headers)
+        self.assertNotIn("Referer", request.headers)
+        self.assertNotIn("auth-token-value", request.headers.get("Cookie", ""))
+
+    @responses.activate
+    def test_redirect_within_the_site_keeps_data_and_headers(self):
+        # GIVEN
+        amazon_session = AmazonSession(config=self.test_config)
+        responses.add(responses.POST, "https://www.amazon.com/ap/signin", status=307,
+                      headers={"Location": "https://na.account.amazon.com/ap/signin"})
+        same_site_response = responses.add(responses.POST, "https://na.account.amazon.com/ap/signin", body="ok")
+
+        # WHEN
+        amazon_session.post("https://www.amazon.com/ap/signin", data={"email": "some-username@gmail.com"})
+
+        # THEN
+        request = same_site_response.calls[0].request
+        self.assertEqual("email=some-username%40gmail.com", request.body)
+        self.assertIn("Origin", request.headers)
+        self.assertIn("Referer", request.headers)
+
+    @unittest.skipIf(sys.platform == "win32", reason="Windows does not support POSIX file permissions")
+    @responses.activate
     def test_persisted_cookie_jar_is_owner_only(self):
         # GIVEN
         amazon_session = AmazonSession("some-username@gmail.com", "some-password", config=self.test_config)
