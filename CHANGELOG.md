@@ -6,6 +6,10 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased](https://github.com/alexdlaird/amazon-auth/compare/0.2.0...HEAD)
 
+### Fixed
+
+- `PlaywrightBrowserLogin.login()` no longer fails with `AttributeError` once sign-in completes in the browser, when used without `amazon-orders`. It verified the session against an `amazon-orders`-only URL.
+
 ## [0.2.0](https://github.com/alexdlaird/amazon-auth/compare/0.1.1...0.2.0) - 2026-11-09
 
 ### Removed
