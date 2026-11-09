@@ -3,8 +3,6 @@ __license__ = "MIT"
 
 import os
 import pickle
-import sys
-import tempfile
 from unittest.mock import patch
 
 import yaml
@@ -152,16 +150,15 @@ some_custom_config: {custom_config}
 
     def test_class_whose_own_import_fails_raises(self):
         # GIVEN
-        with tempfile.TemporaryDirectory() as module_dir:
-            with open(os.path.join(module_dir, "constants_needing_uninstalled_package.py"), "w") as f:
-                f.write("import some_uninstalled_dependency\n")
-            config_path = self.given_config_file("constants_class: constants_needing_uninstalled_package.Constants\n")
+        config_path = self.given_config_file("constants_class: constants_needing_uninstalled_package.Constants\n")
+        dependency_error = ModuleNotFoundError("No module named 'some_uninstalled_dependency'",
+                                               name="some_uninstalled_dependency")
 
-            # WHEN / THEN
-            with patch.object(sys, "path", [module_dir, *sys.path]), \
-                    self.assertRaises(ModuleNotFoundError) as cm:
-                AmazonAuthConfig(config_path=config_path)
-            self.assertEqual("some_uninstalled_dependency", cm.exception.name)
+        # WHEN / THEN
+        with patch("amazonauth.util.importlib.import_module", side_effect=dependency_error), \
+                self.assertRaises(ModuleNotFoundError) as cm:
+            AmazonAuthConfig(config_path=config_path)
+        self.assertEqual("some_uninstalled_dependency", cm.exception.name)
 
     def test_update_config_with_class_whose_package_is_not_installed_raises(self):
         # GIVEN
