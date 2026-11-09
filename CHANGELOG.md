@@ -4,7 +4,13 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased](https://github.com/alexdlaird/amazon-auth/compare/0.1.0...HEAD)
+## [Unreleased](https://github.com/alexdlaird/amazon-auth/compare/0.1.1...HEAD)
+
+## [0.1.1](https://github.com/alexdlaird/amazon-auth/compare/0.1.0...0.1.1) - 2026-11-09
+
+### Security
+
+- The `Host` header is no longer pinned, which sent Amazon's session cookies to any host requested, including through an off-site redirect.
 
 ## [0.1.0](https://github.com/alexdlaird/amazon-auth/compare/0.0.2...0.1.0) - 2026-11-05
 
