@@ -188,6 +188,27 @@ some_custom_config: {custom_config}
         self.assertEqual(0o600, os.stat(config_path).st_mode & 0o777)
         self.assertEqual([], [name for name in os.listdir(os.path.dirname(config_path)) if name.endswith(".tmp")])
 
+    @unittest.skipIf(sys.platform == "win32", reason="Windows does not support POSIX file permissions")
+    def test_saved_config_is_written_through_a_symlink(self):
+        # GIVEN
+        target_dir = os.path.join(conf.DEFAULT_CONFIG_DIR, "dotfiles")
+        os.makedirs(target_dir, exist_ok=True)
+        target_path = os.path.join(target_dir, "config.yml")
+        with open(target_path, "w") as f:
+            f.write("max_auth_attempts: 3\n")
+        config_path = os.path.join(conf.DEFAULT_CONFIG_DIR, "linked-config.yml")
+        os.symlink(target_path, config_path)
+        config = AmazonAuthConfig(config_path=config_path)
+
+        # WHEN
+        config.update_config("max_auth_attempts", 7)
+
+        # THEN
+        self.assertTrue(os.path.islink(config_path))
+        with open(target_path, "r") as f:
+            self.assertEqual(7, yaml.safe_load(f)["max_auth_attempts"])
+        self.assertEqual(0o600, os.stat(target_path).st_mode & 0o777)
+
     def test_update_config(self):
         # GIVEN
         config = AmazonAuthConfig(data={

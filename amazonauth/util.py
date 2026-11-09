@@ -156,6 +156,7 @@ def write_private_file(path: str,
     :param path: The file to write.
     :param content: The text to write.
     """
+    path = os.path.realpath(path)
     file_descriptor, temp_path = tempfile.mkstemp(dir=os.path.dirname(path) or ".",
                                                   prefix=f".{os.path.basename(path)}-", suffix=".tmp")
     try:
