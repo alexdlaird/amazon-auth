@@ -4,7 +4,9 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased](https://github.com/alexdlaird/amazon-auth/compare/0.2.1...HEAD)
+## [Unreleased](https://github.com/alexdlaird/amazon-auth/compare/0.2.2...HEAD)
+
+## [0.2.2](https://github.com/alexdlaird/amazon-auth/compare/0.2.1...0.2.2) - 2026-11-09
 
 ### Added
 
