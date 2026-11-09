@@ -22,7 +22,6 @@ dependencies = [
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
-    "Environment :: Console",
     "Intended Audience :: Developers",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
@@ -54,6 +53,10 @@ lxml = [
 captcha = [
     "amazoncaptcha>=0.4",
 ]
+integration = [
+    "pytest-rerunfailures",
+    "parameterized"
+]
 docs = [
     "Sphinx",
     "sphinx-notfound-page",
@@ -78,9 +81,6 @@ dev = [
     "types-Pillow",
     "responses",
 ]
-
-[project.scripts]
-amazon-auth = "amazonauth.cli:amazon_auth_cli"
 
 [project.urls]
 Changelog = "https://github.com/alexdlaird/amazon-auth/blob/main/CHANGELOG.md"

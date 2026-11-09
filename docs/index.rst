@@ -1,6 +1,6 @@
-****************************************************************************
-Amazon Auth - Sign in to Amazon's consumer website from Python (and the CLI)
-****************************************************************************
+**************************************************************
+Amazon Auth - Sign in to Amazon's consumer website from Python
+**************************************************************
 
 .. only:: builder_html
 
@@ -18,7 +18,7 @@ Amazon Auth - Sign in to Amazon's consumer website from Python (and the CLI)
       :target: https://github.com/alexdlaird/amazon-auth
 
 ``amazon-auth`` is an unofficial library that signs in to Amazon's consumer website and persists the session, so it
-can be reused from Python or the command line. It handles sign-in, OTP and MFA, challenges, and browser sign-in.
+can be reused from Python. It handles sign-in, OTP and MFA, challenges, and browser sign-in.
 `amazon-orders <https://amazon-orders.readthedocs.io>`_ is built on it.
 
 .. note::
@@ -37,10 +37,10 @@ using ``pip``:
 
     pip install amazon-auth --upgrade
 
-That's it! ``amazon-auth`` is now available as a package to your Python projects and from the command line.
+That's it! ``amazon-auth`` is now available as a package to your Python projects.
 
-If pinning, be sure to use a wildcard for the `minor version <https://semver.org/>`_ (e.g. ``==0.1.*``, not
-``==0.1.0``) to ensure you always get the latest stable release.
+If pinning, be sure to use a wildcard for the `minor version <https://semver.org/>`_ (e.g. ``==0.2.*``, not
+``==0.2.0``) to ensure you always get the latest stable release.
 
 Basic Usage
 ===========
@@ -60,16 +60,31 @@ the signed-in session through :func:`~amazonauth.session.AmazonSession.get` and
     response = amazon_session.get("https://www.amazon.com/gp/css/homepage.html")
     print(response.parsed.title.text)
 
-Command Line Usage
-------------------
+Command Line Interfaces
+-----------------------
 
-You can also sign in, check, and end the persisted session from the command line:
+``amazon-auth`` has no command line of its own. A `Click <https://click.palletsprojects.com>`_ CLI built on it can
+register its ``login``, ``logout`` and ``check-session`` commands, which read the session from
+``ctx.obj["amazon_session"]``:
 
-.. code:: sh
+.. code:: python
 
-    amazon-auth login
-    amazon-auth check-session --verify
-    amazon-auth logout
+    import click
+
+    from amazonauth.cli import IOClick, check_session, login, logout
+    from amazonauth.session import AmazonSession
+
+
+    @click.group()
+    @click.pass_context
+    def my_cli(ctx):
+        ctx.ensure_object(dict)
+        ctx.obj["amazon_session"] = AmazonSession(io=IOClick())
+
+
+    my_cli.add_command(login)
+    my_cli.add_command(logout)
+    my_cli.add_command(check_session)
 
 .. _secure-sign-in:
 
@@ -79,11 +94,15 @@ Secure Sign-In
 The most secure way to use ``amazon-auth`` is to sign in on Amazon's own page, in a browser window, so your
 credentials never need to be stored:
 
-.. code:: sh
+.. code:: python
 
-    amazon-auth login --browser
+    from amazonauth.contrib.browser.playwright import PlaywrightBrowserLogin
+    from amazonauth.session import AmazonSession
 
-The session is persisted, so neither the CLI nor the Python API needs credentials:
+    amazon_session = AmazonSession()
+    PlaywrightBrowserLogin(amazon_session).login()
+
+The session is persisted, so later sign-ins need no credentials:
 
 .. code:: python
 
@@ -109,7 +128,7 @@ environment variables ``amazon-auth`` looks for are:
 
 Any other config value can be set the same way, as ``AMAZON_<KEY>`` (see :class:`~amazonauth.conf.AmazonAuthConfig`).
 
-A configured username also applies to ``amazon-auth login --browser``: it's filled in and submitted for you, so the
+A configured username also applies to :class:`~amazonauth.contrib.browser.playwright.PlaywrightBrowserLogin`: it's filled in and submitted for you, so the
 browser opens on Amazon's password or passkey step. The browser never fills in your password.
 
 Handling Challenges

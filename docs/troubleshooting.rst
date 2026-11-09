@@ -8,31 +8,27 @@ Enable Debug Mode
 Enabling ``debug`` mode does a few main things:
 
 1. Sets ``logger`` levels to ``DEBUG``
-2. Sends ``logger`` output to ``stderr``, so you'll see it on the console when using the CLI
-3. HTML pages will be saved locally
+2. HTML pages will be saved locally
 
 To enable ``debug`` mode in Python, you need to pass ``debug=True`` to
 :class:`~amazonauth.session.AmazonSession`:
 
 .. code-block:: python
 
+    import logging
+
     from amazonauth.session import AmazonSession
+
+    logging.basicConfig()
 
     amazon_session = AmazonSession("<AMAZON_EMAIL>",
                                    "<AMAZON_PASSWORD>",
                                    debug=True)
     amazon_session.login()
 
-To enable ``debug`` mode when using the CLI, pass the ``--debug`` flag, which works with any
-command:
-
-.. code-block:: shell
-
-  amazon-auth --debug login
-
 Integrating with Amazon.com via scraping is complicated and requires ``form`` data from the
 website's HTML. Before submitting a bug report or requesting a new feature, try running
-``amazon-auth`` one of the ways described above, and if any console output or generated HTML
+``amazon-auth`` as described above, and if any console output or generated HTML
 files are relevant to the issue, attach them to your request.
 
 .. _login-challenges:

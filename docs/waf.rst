@@ -4,7 +4,7 @@ Solving WAF Challenges
 
 Amazon may present an `AWS WAF (Web Application Firewall) <https://docs.aws.amazon.com/waf/latest/developerguide/waf-captcha-puzzle-examples.html>`_
 JavaScript challenge during login. ``amazon-auth`` ships built-in support for solving these via third-party
-solver services as opt-in extras. Once one is configured, ``amazon-auth login`` clears the challenge
+solver services as opt-in extras. Once one is configured, :func:`~amazonauth.session.AmazonSession.login` clears the challenge
 automatically.
 
 .. note::
@@ -50,7 +50,7 @@ Set your API key as an environment variable:
 Add ``amazonauth.contrib.waf.capsolver.CapSolverWafForm`` to ``auth_forms_classes`` in the
 :class:`config <amazonauth.conf.AmazonAuthConfig>`.
 
-Now ``amazon-auth login`` will clear any AWS WAF challenge it encounters during sign-in.
+Now :func:`~amazonauth.session.AmazonSession.login` will clear any AWS WAF challenge it encounters during sign-in.
 
 Anti-Captcha
 ------------

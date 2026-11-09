@@ -2,15 +2,12 @@ __copyright__ = "Copyright (c) 2024-2025 Alex Laird"
 __license__ = "MIT"
 
 import logging
-import platform
 import sys
 from typing import Any, List, Optional
 
 import click
 from click.core import Context
 
-from amazonauth import __version__
-from amazonauth.conf import AmazonAuthConfig
 from amazonauth.contrib.browser.playwright import PlaywrightBrowserLauncher, PlaywrightBrowserLogin
 from amazonauth.exception import AmazonAuthBrowserNotInstalledError, AmazonAuthError, AmazonAuthSignInError
 from amazonauth.session import AmazonSession, IODefault
@@ -120,70 +117,7 @@ class CliAuth:
             browser_login.login()
 
 
-@click.group()
-@click.option("--username", help="An Amazon username.")
-@click.option("--password", help="An Amazon password.")
-@click.option("--debug", is_flag=True, default=False,
-              help="Enable debugging and send output to "
-                   "command line.")
-@click.option("--config-path",
-              help="The config path.")
-@click.option("--max-auth-attempts",
-              help="The max auth loop attempts to make (successes and failures), passing this overrides config value.")
-@click.option("--output-dir",
-              help="The directory where any output files should be produced, passing this overrides config value.")
-@click.option("--domain",
-              help="The Amazon domain to target (e.g. amazon.com, amazon.co.uk, amazon.com.au). "
-                   "Defaults to amazon.com.")
-@click.pass_context
-def amazon_auth_cli(ctx: Context,
-                    **kwargs: Any) -> None:
-    """
-    amazon-auth signs in to Amazon's consumer website and persists the session, so it can be reused from the
-    CLI or Python.
-
-    Documentation can be found at https://amazon-auth.readthedocs.io.
-    """
-    ctx.ensure_object(dict)
-    for key, value in kwargs.items():
-        if value:
-            ctx.obj[key] = value
-
-    if kwargs["debug"]:
-        logger.setLevel(logging.DEBUG)
-        logger.addHandler(logging.StreamHandler())
-
-    data = {}
-    if kwargs.get("output_dir"):
-        data["output_dir"] = kwargs["output_dir"]
-    if kwargs.get("max_auth_attempts"):
-        data["max_auth_attempts"] = kwargs["max_auth_attempts"]
-    if kwargs.get("domain"):
-        data["domain"] = kwargs["domain"]
-    ctx.obj["conf_data"] = data
-
-    if ctx.invoked_subcommand == "version":
-        return
-
-    try:
-        ctx.obj["conf"] = AmazonAuthConfig(config_path=kwargs.get("config_path"),
-                                           data=data)
-    except AmazonAuthError as e:
-        ctx.fail(str(e))
-
-    username = kwargs.get("username")
-    password = kwargs.get("password")
-
-    amazon_session = AmazonSession(username,
-                                   password,
-                                   debug=kwargs["debug"],
-                                   io=IOClick(),
-                                   config=ctx.obj["conf"])
-
-    ctx.obj["amazon_session"] = amazon_session
-
-
-@amazon_auth_cli.command(short_help="Check if a persisted session exists.")
+@click.command(short_help="Check if a persisted session exists.")
 @click.pass_context
 @click.option("--verify", is_flag=True, default=False,
               help="Also ask Amazon whether it still accepts the persisted session.")
@@ -209,7 +143,7 @@ def check_session(ctx: Context, **kwargs: Any) -> None:
         ctx.fail(str(e))
 
 
-@amazon_auth_cli.command()
+@click.command()
 @click.pass_context
 @click.option("--browser", is_flag=True, default=False,
               help="Sign in with a browser window, so your credentials never need to be stored. "
@@ -236,7 +170,7 @@ def login(ctx: Context, **kwargs: Any) -> None:
     click.echo("Info: Successfully logged in to Amazon, session persisted.\n")
 
 
-@amazon_auth_cli.command()
+@click.command()
 @click.pass_context
 def logout(ctx: Context) -> None:
     """
@@ -246,17 +180,3 @@ def logout(ctx: Context) -> None:
     amazon_session.logout()
 
     click.echo("Info: Successfully logged out of Amazon.\n")
-
-
-@amazon_auth_cli.command()
-@click.pass_context
-def version(ctx: Context) -> None:
-    """
-    Show the banner and package version.
-    """
-    click.echo(f"amazon-auth/{__version__} Python/{platform.python_version()}")
-    ctx.exit(0)
-
-
-if __name__ == "__main__":
-    amazon_auth_cli(obj={})

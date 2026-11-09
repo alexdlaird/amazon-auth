@@ -3,12 +3,31 @@ __license__ = "MIT"
 
 from unittest.mock import patch
 
+import click
 import responses
 from click.testing import CliRunner
 
-from amazonauth.cli import amazon_auth_cli
+from amazonauth.cli import IOClick, check_session, login, logout
+from amazonauth.conf import AmazonAuthConfig
 from amazonauth.exception import AmazonAuthBrowserNotInstalledError
+from amazonauth.session import AmazonSession
 from tests.unittestcase import UnitTestCase
+
+
+@click.group()
+@click.option("--username")
+@click.option("--password")
+@click.option("--config-path")
+@click.pass_context
+def downstream_cli(ctx, username, password, config_path):
+    ctx.ensure_object(dict)
+    ctx.obj["amazon_session"] = AmazonSession(username, password, io=IOClick(),
+                                              config=AmazonAuthConfig(config_path=config_path))
+
+
+downstream_cli.add_command(check_session)
+downstream_cli.add_command(login)
+downstream_cli.add_command(logout)
 
 
 class TestCli(UnitTestCase):
@@ -26,7 +45,7 @@ class TestCli(UnitTestCase):
         self.given_login_responses_success()
 
         # WHEN
-        response = self.runner.invoke(amazon_auth_cli,
+        response = self.runner.invoke(downstream_cli,
                                       [
                                           "--config-path", self.test_config.config_path,
                                           "--username", "some-username@gmail.com",
@@ -45,7 +64,7 @@ class TestCli(UnitTestCase):
         ]
 
     def invoke_login_with_browser(self, input=None):
-        return self.runner.invoke(amazon_auth_cli,
+        return self.runner.invoke(downstream_cli,
                                   ["--config-path", self.test_config.config_path, "login", "--browser"],
                                   input=input)
 
@@ -143,7 +162,7 @@ class TestCli(UnitTestCase):
         signout_response = self.given_logout_response_success()
 
         # WHEN
-        response = self.runner.invoke(amazon_auth_cli,
+        response = self.runner.invoke(downstream_cli,
                                       [
                                           "--config-path", self.test_config.config_path,
                                           "logout"
@@ -159,7 +178,7 @@ class TestCli(UnitTestCase):
         self.given_persisted_session_exists()
 
         # WHEN
-        response = self.runner.invoke(amazon_auth_cli,
+        response = self.runner.invoke(downstream_cli,
                                       [
                                           "--config-path", self.test_config.config_path,
                                           "check-session"
@@ -173,7 +192,7 @@ class TestCli(UnitTestCase):
     @responses.activate
     def test_check_session_command_no_persisted_session(self):
         # WHEN
-        response = self.runner.invoke(amazon_auth_cli,
+        response = self.runner.invoke(downstream_cli,
                                       [
                                           "--config-path", self.test_config.config_path,
                                           "check-session"
@@ -191,7 +210,7 @@ class TestCli(UnitTestCase):
         history_response = self.given_session_check_page_exists()
 
         # WHEN
-        response = self.runner.invoke(amazon_auth_cli,
+        response = self.runner.invoke(downstream_cli,
                                       [
                                           "--config-path", self.test_config.config_path,
                                           "check-session",
@@ -211,7 +230,7 @@ class TestCli(UnitTestCase):
         auth_redirect_response = self.given_authenticated_url_redirects_to_login()
 
         # WHEN
-        response = self.runner.invoke(amazon_auth_cli,
+        response = self.runner.invoke(downstream_cli,
                                       [
                                           "--config-path", self.test_config.config_path,
                                           "check-session",
@@ -227,7 +246,7 @@ class TestCli(UnitTestCase):
     @responses.activate
     def test_check_session_command_verify_no_persisted_session(self):
         # WHEN
-        response = self.runner.invoke(amazon_auth_cli,
+        response = self.runner.invoke(downstream_cli,
                                       [
                                           "--config-path", self.test_config.config_path,
                                           "check-session",
@@ -246,7 +265,7 @@ class TestCli(UnitTestCase):
         history_response = self.given_session_check_page_exists(status=503)
 
         # WHEN
-        response = self.runner.invoke(amazon_auth_cli,
+        response = self.runner.invoke(downstream_cli,
                                       [
                                           "--config-path", self.test_config.config_path,
                                           "check-session",
@@ -264,7 +283,7 @@ class TestCli(UnitTestCase):
         self.given_persisted_session_exists()
 
         # WHEN
-        response = self.runner.invoke(amazon_auth_cli,
+        response = self.runner.invoke(downstream_cli,
                                       [
                                           "--config-path", self.test_config.config_path,
                                           "check-session",

@@ -4,7 +4,13 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased](https://github.com/alexdlaird/amazon-auth/compare/0.1.1...HEAD)
+## [Unreleased](https://github.com/alexdlaird/amazon-auth/compare/0.2.0...HEAD)
+
+## [0.2.0](https://github.com/alexdlaird/amazon-auth/compare/0.1.1...0.2.0) - 2026-11-09
+
+### Removed
+
+- The `amazon-auth` command and its `version` command. `amazon-auth` is a library to build on: a Click CLI built on it registers the `login`, `logout` and `check-session` commands from `amazonauth.cli`, as `amazon-orders` does.
 
 ## [0.1.1](https://github.com/alexdlaird/amazon-auth/compare/0.1.0...0.1.1) - 2026-11-09
 
