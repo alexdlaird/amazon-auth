@@ -1,0 +1,55 @@
+name: Site Checks
+
+run-name: Site Checks ${{ github.ref_name }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      use_vpn:
+        description: 'Route traffic through a VPN (also on when the USE_VPN repo variable is true)'
+        required: false
+        type: boolean
+        default: false
+  schedule:
+    - cron: "0 8 * * *"
+
+permissions:
+  contents: read
+  issues: none
+  pull-requests: none
+
+concurrency:
+  group: amazon-auth-site-checks-singleton
+
+jobs:
+  test:
+    name: Signed-Out Site Checks
+
+    env:
+      FORCE_COLOR: 1
+      PYTHONUNBUFFERED: 1
+      PYTHONDONTWRITEBYTECODE: 1
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Connect VPN
+        if: ${{ inputs.use_vpn || vars.USE_VPN == 'true' }}
+        timeout-minutes: 5
+        env:
+          WIREGUARD_CONFIG: ${{ secrets.VPN_WIREGUARD_CONFIG }}
+        run: .github/scripts/connect-vpn.sh
+      - name: Signed-out site checks
+        run: .github/scripts/vpn-exec.sh make test-integration-sites
+      - name: Upload test results
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@v6
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          directory: ./build/test-results
+          report_type: test_results

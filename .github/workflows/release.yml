@@ -4,6 +4,12 @@ run-name: Release
 
 on:
   workflow_dispatch:
+    inputs:
+      run_integration_tests:
+        description: 'Run integration tests'
+        required: true
+        type: boolean
+        default: true
 
 permissions:
   contents: write
@@ -21,8 +27,17 @@ jobs:
       bot_app_id: ${{ secrets.RELEASE_BOT_APP_ID }}
       bot_private_key: ${{ secrets.RELEASE_BOT_PRIVATE_KEY }}
 
+  integration:
+    needs: prereq
+    if: ${{ inputs.run_integration_tests }}
+    uses: ./.github/workflows/integration.yml
+    with:
+      use_waf_solver: true
+    secrets: inherit
+
   build:
-    needs: [prereq]
+    needs: [prereq, integration]
+    if: ${{ always() && needs.prereq.result == 'success' && (needs.integration.result == 'success' || needs.integration.result == 'skipped') }}
     runs-on: ubuntu-latest
 
     permissions:

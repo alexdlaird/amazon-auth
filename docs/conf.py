@@ -80,7 +80,7 @@ ogp_social_cards = {"enable": False}
 ogp_enable_meta_description = False
 ogp_custom_meta_tags = [
     '<meta name="description" content="amazon-auth is an unofficial library that signs in to Amazon\'s consumer-facing website, '
-    'and persists the session for reuse from Python or the command line.">',
+    'and persists the session for reuse from Python.">',
     '<meta name="twitter:card" content="summary_large_image">',
 ]
 
@@ -191,7 +191,7 @@ man_pages = [
 texinfo_documents = [
     (master_doc, "amazonauth", "amazon-auth Documentation",
      author, "amazon-auth",
-     "Sign in to Amazon's consumer website from Python (and the CLI)",
+     "Sign in to Amazon's consumer website from Python",
      "Miscellaneous"),
 ]
 

@@ -1,8 +1,17 @@
-.PHONY: all install nopyc clean test docs check generate-region-data local validate-release
+.PHONY: all install nopyc clean test test-integration test-integration-sites download-integration-output docs check generate-region-data local validate-release install-waf install-browser
 
 SHELL := /usr/bin/env bash
 PYTHON_BIN ?= python
 PROJECT_VENV ?= venv
+INTEGRATION_TEST_RERUN ?= 2
+INTEGRATION_TEST_RERUN_DELAY ?= 300
+INTEGRATION_TEST_FAIL_FAST ?= false
+PYTEST_EXTRA_ARGS ?=
+INTEGRATION_OUTPUT_DIR ?= build/integration-test-output
+INTEGRATION_RUN_ID ?= $(shell gh run list --workflow integration.yml --limit 1 --json databaseId --jq '.[0].databaseId')
+SSH_KEY ?= ~/.ssh/id_rsa
+
+WAF_EXTRAS := capsolver,anticaptcha,2captcha
 
 all: local check test
 
@@ -16,6 +25,19 @@ install: venv
 		python -m pip install .; \
 	)
 
+install-waf:
+	@( \
+		source $(PROJECT_VENV)/bin/activate; \
+		python -m pip install ".[$(WAF_EXTRAS)]"; \
+	)
+
+install-browser:
+	@( \
+		source $(PROJECT_VENV)/bin/activate; \
+		python -m pip install ".[browser]"; \
+		playwright install chromium --with-deps; \
+	)
+
 nopyc:
 	find . -name '*.pyc' | xargs rm -f || true
 	find . -name __pycache__ | xargs rm -rf || true
@@ -27,7 +49,30 @@ test: install
 	@( \
 		source $(PROJECT_VENV)/bin/activate; \
 		python -m pip install ".[dev]"; \
-		coverage run -m pytest -v && coverage report && coverage xml && coverage html; \
+		coverage run -m pytest -v --ignore=tests/integration -o junit_suite_name=unit && coverage report && coverage xml && coverage html; \
+	)
+
+test-integration: install
+	@( \
+		source $(PROJECT_VENV)/bin/activate; \
+		python -m pip install ".[dev,integration]"; \
+		pytest -v tests/integration --ignore=tests/integration/test_integration_sites.py -o junit_suite_name=integration --reruns ${INTEGRATION_TEST_RERUN} --reruns-delay ${INTEGRATION_TEST_RERUN_DELAY} $(if $(filter true,${INTEGRATION_TEST_FAIL_FAST}),-x) ${PYTEST_EXTRA_ARGS}; \
+	)
+
+test-integration-sites: install
+	@( \
+		source $(PROJECT_VENV)/bin/activate; \
+		python -m pip install ".[dev,integration]"; \
+		pytest -v -rs tests/integration/test_integration_sites.py -o junit_suite_name=integration-sites ${PYTEST_EXTRA_ARGS}; \
+	)
+
+download-integration-output:
+	@( \
+		rm -rf $(INTEGRATION_OUTPUT_DIR) && \
+		gh run download $(INTEGRATION_RUN_ID) -n integration-test-output -D $(INTEGRATION_OUTPUT_DIR) && \
+		age -d -i $(SSH_KEY) $(INTEGRATION_OUTPUT_DIR)/integration-test-output.tar.gz.age | tar xzf - -C $(INTEGRATION_OUTPUT_DIR) && \
+		rm $(INTEGRATION_OUTPUT_DIR)/integration-test-output.tar.gz.age && \
+		echo "Integration test output from run $(INTEGRATION_RUN_ID) is in $(INTEGRATION_OUTPUT_DIR)"; \
 	)
 
 docs: install

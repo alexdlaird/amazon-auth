@@ -76,7 +76,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install ".[dev,captcha]"
       - name: Test
-        run: python -m pytest -v
+        run: python -m pytest -v --ignore=tests/integration
 
   validate:
     name: Validate

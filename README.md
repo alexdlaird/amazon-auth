@@ -8,8 +8,8 @@
 [![GitHub License](https://img.shields.io/github/license/alexdlaird/amazon-auth)](https://github.com/alexdlaird/amazon-auth/blob/main/LICENSE)
 
 `amazon-auth` is an unofficial library that signs in to Amazon's consumer website (amazon.com and other Amazon sites)
-and persists the session, so it can be reused from Python or the command line. It handles sign-in, OTP and MFA,
-challenges, and browser sign-in. [`amazon-orders`](https://github.com/alexdlaird/amazon-orders) is built on it.
+and persists the session, so it can be reused from Python. It handles sign-in, OTP and MFA, challenges, and browser
+sign-in. [`amazon-orders`](https://github.com/alexdlaird/amazon-orders) is built on it.
 
 > **Note:** This package works by parsing Amazon's consumer-facing website. As Amazon provides no official API to use,
 > older versions of this package may break at any time, so it's recommended that you use the latest version.
@@ -22,9 +22,9 @@ challenges, and browser sign-in. [`amazon-orders`](https://github.com/alexdlaird
 pip install amazon-auth --upgrade
 ```
 
-That's it! `amazon-auth` is now available as a package to your Python projects and from the command line.
+That's it! `amazon-auth` is now available as a package to your Python projects.
 
-If pinning, be sure to use a wildcard for the [minor version](https://semver.org/) (e.g. `==0.1.*`, not `==0.1.0`) to
+If pinning, be sure to use a wildcard for the [minor version](https://semver.org/) (e.g. `==0.2.*`, not `==0.2.0`) to
 ensure you always get the latest stable release.
 
 ## Basic Usage
@@ -46,8 +46,12 @@ print(response.parsed.title.text)
 The most secure way to sign in is on Amazon's own page, in a browser window, so your credentials never need to be
 stored (this requires the `browser` extra, `pip install amazon-auth[browser]`):
 
-```sh
-amazon-auth login --browser
+```python
+from amazonauth.contrib.browser.playwright import PlaywrightBrowserLogin
+from amazonauth.session import AmazonSession
+
+amazon_session = AmazonSession()
+PlaywrightBrowserLogin(amazon_session).login()
 ```
 
 The session is persisted, so `AmazonSession().login()` reuses it without credentials.
