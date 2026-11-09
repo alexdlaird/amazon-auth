@@ -3,13 +3,17 @@ __license__ = "MIT"
 
 import os
 import pickle
+import sys
+import tempfile
 from unittest.mock import patch
 
 import yaml
 
 from amazonauth import conf
 from amazonauth.conf import AmazonAuthConfig
+from amazonauth.constants import AuthConstants
 from amazonauth.exception import AmazonAuthError
+from amazonauth.selectors import AuthSelectors
 from tests.unittestcase import UnitTestCase
 
 
@@ -118,6 +122,58 @@ some_custom_config: {custom_config}
         # THEN
         self.assertEqual("html.parser", config.bs4_parser)
         self.assertTrue(any("this-parser-does-not-exist" in m for m in logs.output))
+
+    def test_class_whose_package_is_not_installed_falls_back_to_default(self):
+        # GIVEN
+        config_path = self.given_config_file("constants_class: some_uninstalled_package.constants.Constants\n"
+                                             "selectors_class: some_uninstalled_package.selectors.Selectors\n")
+
+        # WHEN
+        with self.assertLogs("amazonauth.conf", level="WARNING") as logs:
+            config = AmazonAuthConfig(config_path=config_path)
+            config.set_domain("amazon.de")
+
+        # THEN
+        self.assertIs(AuthConstants, type(config.constants))
+        self.assertIs(AuthSelectors, type(config.selectors))
+        self.assertEqual(2, len(logs.output))
+        self.assertIn("constants_class 'some_uninstalled_package.constants.Constants' is unavailable", logs.output[0])
+        self.assertIn("selectors_class 'some_uninstalled_package.selectors.Selectors' is unavailable", logs.output[1])
+        self.assertEqual("some_uninstalled_package.constants.Constants", config.constants_class)
+        self.assertIs(AuthConstants, type(pickle.loads(pickle.dumps(config)).constants))
+
+    def test_class_missing_from_installed_module_raises(self):
+        # GIVEN
+        config_path = self.given_config_file("constants_class: amazonauth.constants.NoSuchConstants\n")
+
+        # WHEN / THEN
+        with self.assertRaises(AttributeError):
+            AmazonAuthConfig(config_path=config_path)
+
+    def test_class_whose_own_import_fails_raises(self):
+        # GIVEN
+        with tempfile.TemporaryDirectory() as module_dir:
+            with open(os.path.join(module_dir, "constants_needing_uninstalled_package.py"), "w") as f:
+                f.write("import some_uninstalled_dependency\n")
+            config_path = self.given_config_file("constants_class: constants_needing_uninstalled_package.Constants\n")
+
+            # WHEN / THEN
+            with patch.object(sys, "path", [module_dir, *sys.path]), \
+                    self.assertRaises(ModuleNotFoundError) as cm:
+                AmazonAuthConfig(config_path=config_path)
+            self.assertEqual("some_uninstalled_dependency", cm.exception.name)
+
+    def test_update_config_with_class_whose_package_is_not_installed_raises(self):
+        # GIVEN
+        config = AmazonAuthConfig()
+
+        # WHEN
+        with self.assertRaises(ModuleNotFoundError):
+            config.update_config("constants_class", "some_uninstalled_package.constants.Constants")
+
+        # THEN
+        self.assertEqual("amazonauth.constants.AuthConstants", config.constants_class)
+        self.assertIs(AuthConstants, type(config.constants))
 
     def test_update_config(self):
         # GIVEN
