@@ -4,7 +4,6 @@ __license__ = "MIT"
 import json
 import logging
 import os
-import tempfile
 import time
 from typing import Any, Dict, List, Optional, Type, Union
 from urllib.parse import urlparse
@@ -18,7 +17,7 @@ from amazonauth.conf import AmazonAuthConfig, cookies_file_lock, debug_output_fi
 from amazonauth.exception import AmazonAuthSignInError, AmazonAuthError, AmazonAuthRedirectError
 from amazonauth.forms import (AuthForm, AcicAuthBlocker, CaptchaForm, JSAuthBlocker, MfaDeviceSelectForm, MfaForm,
                               SignInForm, ClaimForm, IntentForm, PasskeyForm)
-from amazonauth.util import AmazonSessionResponse, load_class, select_one
+from amazonauth.util import AmazonSessionResponse, load_class, make_private_dirs, select_one, write_private_file
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +56,38 @@ class IODefault:
             self.echo(choice, **kwargs)
 
         return input(f"--> {msg}: ")
+
+
+class RedirectGuardSession(Session):
+    """
+    A :class:`requests.Session` that follows redirects only where it's safe to: never to ``http``, never re-sending
+    a request's data (like a sign-in form, with its password) to another site, and without the ``Origin`` and
+    ``Referer`` that name the Amazon page it came from when it leaves the site.
+    """
+
+    def rebuild_auth(self,
+                     prepared_request: requests.PreparedRequest,
+                     response: Response) -> None:
+        super().rebuild_auth(prepared_request, response)
+
+        destination = urlparse(prepared_request.url)
+        if destination.scheme != "https":
+            raise AmazonAuthError(f"Refused to follow a redirect from {response.url} to {prepared_request.url}, "
+                                  "which isn't over https.")
+
+        if not self._is_same_site(urlparse(response.url).hostname, destination.hostname):
+            if prepared_request.body is not None:
+                raise AmazonAuthError(f"Refused to follow a redirect from {response.url} to {prepared_request.url}, "
+                                      "which would send the request's data to another site.")
+            for header in ("Origin", "Referer"):
+                prepared_request.headers.pop(header, None)
+
+    @staticmethod
+    def _is_same_site(origin_host: Optional[str],
+                      destination_host: Optional[str]) -> bool:
+        site = (origin_host or "").lower().removeprefix("www.")
+        host = (destination_host or "").lower()
+        return bool(site) and (host == site or host.endswith(f".{site}"))
 
 
 class AmazonSession:
@@ -143,7 +174,7 @@ class AmazonSession:
         self._cookie_jar_mtime: Optional[float] = None
 
         with cookies_file_lock:
-            os.makedirs(os.path.dirname(self.config.cookie_jar_path), exist_ok=True)
+            make_private_dirs(os.path.dirname(self.config.cookie_jar_path))
 
             if os.path.exists(self.config.cookie_jar_path):
                 with open(self.config.cookie_jar_path, "r", encoding="utf-8") as f:
@@ -248,13 +279,12 @@ class AmazonSession:
             logger.debug(f"Response: {amazon_session_response.response.status_code}{url_str}")
 
             if not binary:
-                os.makedirs(self.config.output_dir, exist_ok=True)
-                page_name = self._get_page_from_url(self.config.output_dir, amazon_session_response.response.url)
-                with open(os.path.join(self.config.output_dir, page_name), "w",
-                          encoding="utf-8") as html_file:
-                    logger.debug(
-                        f"Response written to file: {html_file.name}")
-                    html_file.write(amazon_session_response.response.text)
+                make_private_dirs(self.config.output_dir)
+                page_path = os.path.join(self.config.output_dir,
+                                         self._get_page_from_url(self.config.output_dir,
+                                                                 amazon_session_response.response.url))
+                write_private_file(page_path, amazon_session_response.response.text)
+                logger.debug(f"Response written to file: {page_path}")
 
         return amazon_session_response
 
@@ -446,16 +476,7 @@ class AmazonSession:
         return domain == self.config.site or domain.endswith(f".{self.config.site}")
 
     def _write_cookie_jar(self) -> None:
-        file_descriptor, temp_path = tempfile.mkstemp(dir=os.path.dirname(self.config.cookie_jar_path),
-                                                      prefix=".cookies-", suffix=".tmp")
-        try:
-            with os.fdopen(file_descriptor, "w", encoding="utf-8") as f:
-                f.write(json.dumps(self._cookie_jar_data()))
-            os.chmod(temp_path, 0o600)
-            os.replace(temp_path, self.config.cookie_jar_path)
-        except BaseException:
-            os.remove(temp_path)
-            raise
+        write_private_file(self.config.cookie_jar_path, json.dumps(self._cookie_jar_data()))
         self._cookie_jar_mtime = self._read_cookie_jar_mtime()
 
     def _read_cookie_jar_mtime(self) -> Optional[float]:
@@ -538,7 +559,7 @@ class AmazonSession:
         raise AmazonAuthSignInError(error_msg)
 
     def _create_session(self) -> Session:
-        session = Session()
+        session = RedirectGuardSession()
         adapter = requests.adapters.HTTPAdapter(pool_connections=self.config.connection_pool_size,
                                                 pool_maxsize=self.config.connection_pool_size)
         session.mount('https://', adapter)

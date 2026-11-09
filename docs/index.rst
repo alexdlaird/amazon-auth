@@ -43,7 +43,7 @@ Amazon Auth - Sign in to Amazon's consumer website from Python
 
 ``amazon-auth`` is an unofficial library that signs in to Amazon's consumer website and persists the session, so it
 can be reused from Python. It handles sign-in, OTP and MFA, challenges, and browser sign-in.
-`amazon-orders <https://amazon-orders.readthedocs.io>`_ is built on it.
+|amazon-orders|_ is built on it.
 
 .. note::
 
@@ -84,31 +84,12 @@ the signed-in session through :func:`~amazonauth.session.AmazonSession.get` and
     response = amazon_session.get("https://www.amazon.com/gp/css/homepage.html")
     print(response.parsed.title.text)
 
-Command Line Interfaces
------------------------
+Building on ``amazon-auth``
+---------------------------
 
-``amazon-auth`` has no command line of its own. A `Click <https://click.palletsprojects.com>`_ CLI built on it can
-register its ``login``, ``logout`` and ``check-session`` commands, which read the session from
-``ctx.obj["amazon_session"]``:
-
-.. code:: python
-
-    import click
-
-    from amazonauth.cli import IOClick, check_session, login, logout
-    from amazonauth.session import AmazonSession
-
-
-    @click.group()
-    @click.pass_context
-    def my_cli(ctx):
-        ctx.ensure_object(dict)
-        ctx.obj["amazon_session"] = AmazonSession(io=IOClick())
-
-
-    my_cli.add_command(login)
-    my_cli.add_command(logout)
-    my_cli.add_command(check_session)
+Packages that read more of Amazon's website, like |amazon-orders|_, are built on
+``amazon-auth`` by subclassing its config, session, constants and selectors, and registering its CLI commands. See
+:doc:`downstream`.
 
 .. _secure-sign-in:
 
@@ -214,6 +195,7 @@ For more advanced usage, dive deeper in to the rest of the documentation.
    :maxdepth: 2
 
    api
+   downstream
    waf
    browser
    troubleshooting

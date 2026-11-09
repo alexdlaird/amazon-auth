@@ -6,6 +6,7 @@ import logging
 import os
 import re
 import sys
+import tempfile
 from typing import List, Union, Optional, Callable, Any
 
 from bs4 import Tag, BeautifulSoup
@@ -144,3 +145,33 @@ def cleanup_html_text(text: str) -> str:
     if not text.endswith("."):
         text += "."
     return text
+
+
+def write_private_file(path: str,
+                       content: str) -> None:
+    """
+    Write a file only the current user can read, since what this package writes holds a session, credentials, or
+    account data.
+
+    :param path: The file to write.
+    :param content: The text to write.
+    """
+    file_descriptor, temp_path = tempfile.mkstemp(dir=os.path.dirname(path) or ".",
+                                                  prefix=f".{os.path.basename(path)}-", suffix=".tmp")
+    try:
+        with os.fdopen(file_descriptor, "w", encoding="utf-8") as f:
+            f.write(content)
+        os.chmod(temp_path, 0o600)
+        os.replace(temp_path, path)
+    except BaseException:
+        os.remove(temp_path)
+        raise
+
+
+def make_private_dirs(path: str) -> None:
+    """
+    Create a directory, and any missing parents, that only the current user can access.
+
+    :param path: The directory to create.
+    """
+    os.makedirs(path, mode=0o700, exist_ok=True)

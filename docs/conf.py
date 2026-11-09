@@ -234,6 +234,13 @@ intersphinx_mapping = {
 }
 
 
+# Package names linking to their docs, styled as code (RST can't nest code in a link), e.g. ``|amazon-auth|_``
+rst_epilog = """
+.. |amazon-orders| replace:: ``amazon-orders``
+.. _amazon-orders: https://amazon-orders.readthedocs.io
+"""
+
+
 # -- Generated content -------------------------------------------------------
 
 def _canonicalize_root_page(app, pagename, templatename, context, doctree):

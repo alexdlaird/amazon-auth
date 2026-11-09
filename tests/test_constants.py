@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 from amazonauth.conf import AmazonAuthConfig
 from amazonauth.constants import AuthConstants
+from amazonauth.exception import AmazonAuthError
 from amazonauth.region_data import REGION_SITES
 from tests.unittestcase import UnitTestCase
 
@@ -169,14 +170,44 @@ class TestConstants(UnitTestCase):
         self.assertEqual(AuthConstants.BASE_HEADERS["Referer"], config.constants.BASE_HEADERS["Referer"])
         self.assertEqual(["x-main"], config.constants.COOKIES_SET_WHEN_AUTHENTICATED)
 
-    def test_domain_unknown_tld_keeps_default_sign_in_and_session_values(self):
-        # GIVEN / WHEN
-        config = AmazonAuthConfig(data={"domain": "amazon.example"})
+    def test_domain_that_is_not_an_amazon_site_raises(self):
+        for domain in ["amazon.example", "amzon.de", "evil.example", "smile.amazon.com", "amazon.de.evil.example",
+                       "https://amazon.com.evil.example", "http://www.amazon.de", "https://www.amazon.de/path",
+                       "https://www.amazon.de:8443", "https://user:password@www.amazon.de"]:
+            with self.subTest(domain=domain):
+                # WHEN
+                with self.assertRaises(AmazonAuthError) as cm:
+                    AmazonAuthConfig(data={"domain": domain})
+
+                # THEN
+                self.assertIn(f"The domain \"{domain}\" isn't an Amazon site.", str(cm.exception))
+                self.assertIn("amazon.co.uk", str(cm.exception))
+
+    def test_domain_forms_of_an_amazon_site_are_accepted(self):
+        for domain, base_url in [("amazon.de", "https://www.amazon.de"), ("www.amazon.de", "https://www.amazon.de"),
+                                 ("https://www.amazon.co.uk/", "https://www.amazon.co.uk"),
+                                 ("https://amazon.com.au", "https://amazon.com.au")]:
+            with self.subTest(domain=domain):
+                # WHEN
+                config = AmazonAuthConfig(data={"domain": domain})
+
+                # THEN
+                self.assertEqual(base_url, config.constants.BASE_URL)
+
+    def test_update_config_with_domain_that_is_not_an_amazon_site_raises_and_keeps_previous(self):
+        # GIVEN
+        config = AmazonAuthConfig(data={"domain": "amazon.de"})
+        config.save()
+
+        # WHEN
+        with self.assertRaises(AmazonAuthError):
+            config.update_config("domain", "amazon.de.evil.example")
 
         # THEN
-        self.assertEqual("usflex", config.constants.SIGN_IN_QUERY_PARAMS["openid.assoc_handle"])
-        self.assertEqual(["x-main"], config.constants.COOKIES_SET_WHEN_AUTHENTICATED)
-        self.assertEqual({}, config.constants.REQUEST_COOKIES)
+        self.assertEqual("amazon.de", config.domain)
+        self.assertEqual("https://www.amazon.de", config.constants.BASE_URL)
+        with open(config.config_path, "r") as f:
+            self.assertNotIn("evil", f.read())
 
     def test_domain_sets_region_language_cookie(self):
         for tld, site in REGION_SITES.items():

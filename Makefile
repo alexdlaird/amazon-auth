@@ -1,4 +1,4 @@
-.PHONY: all install nopyc clean test test-integration test-integration-sites download-integration-output docs check generate-region-data local validate-release install-waf install-browser
+.PHONY: all install nopyc clean test test-integration test-downstream test-integration-sites download-integration-output docs check generate-region-data local validate-release install-waf install-browser
 
 SHELL := /usr/bin/env bash
 PYTHON_BIN ?= python
@@ -10,6 +10,8 @@ PYTEST_EXTRA_ARGS ?=
 INTEGRATION_OUTPUT_DIR ?= build/integration-test-output
 INTEGRATION_RUN_ID ?= $(shell gh run list --workflow integration.yml --limit 1 --json databaseId --jq '.[0].databaseId')
 SSH_KEY ?= ~/.ssh/id_rsa
+DOWNSTREAM_REPO ?= https://github.com/alexdlaird/amazon-orders.git
+DOWNSTREAM_DIR := build/downstream/amazon-orders
 
 WAF_EXTRAS := capsolver,anticaptcha,2captcha
 
@@ -50,6 +52,18 @@ test: install
 		source $(PROJECT_VENV)/bin/activate; \
 		python -m pip install ".[dev]"; \
 		coverage run -m pytest -v --ignore=tests/integration -o junit_suite_name=unit && coverage report && coverage xml && coverage html; \
+	)
+
+test-downstream:
+	@( \
+		rm -rf $(DOWNSTREAM_DIR); \
+		git clone --depth 1 $(DOWNSTREAM_REPO) $(DOWNSTREAM_DIR) || exit $$?; \
+		( make -C $(DOWNSTREAM_DIR) venv ) || exit $$?; \
+		source $(DOWNSTREAM_DIR)/venv/bin/activate; \
+		python -m pip install . || exit $$?; \
+		python -m pip install "./$(DOWNSTREAM_DIR)[dev]" || exit $$?; \
+		python -m pip install --force-reinstall --no-deps . || exit $$?; \
+		cd $(DOWNSTREAM_DIR) && python -m pytest -v tests/unit -o junit_suite_name=downstream; \
 	)
 
 test-integration: install

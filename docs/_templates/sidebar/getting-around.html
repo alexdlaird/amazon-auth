@@ -5,6 +5,7 @@
     <li class="toctree-l1"><a class="reference internal" href="{{ '' if pagename == master_doc else pathto(master_doc) }}#dive-deeper">Dive Deeper</a>
         <ul>
             <li class="toctree-l2{% if pagename == "api" %} current current-page{% endif %}"><a class="reference internal" href="{{ pathto("api") }}">API Documentation</a></li>
+            <li class="toctree-l2{% if pagename == "downstream" %} current current-page{% endif %}"><a class="reference internal" href="{{ pathto("downstream") }}">Building on <code>amazon-auth</code></a></li>
             <li class="toctree-l2{% if pagename == "waf" %} current current-page{% endif %}"><a class="reference internal" href="{{ pathto("waf") }}">Solving WAF Challenges</a></li>
             <li class="toctree-l2{% if pagename == "browser" %} current current-page{% endif %}"><a class="reference internal" href="{{ pathto("browser") }}">Browser Automation</a></li>
             <li class="toctree-l2{% if pagename == "troubleshooting" %} current current-page{% endif %}"><a class="reference internal" href="{{ pathto("troubleshooting") }}">Troubleshooting</a></li>

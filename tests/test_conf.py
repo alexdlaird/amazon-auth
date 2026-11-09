@@ -3,6 +3,8 @@ __license__ = "MIT"
 
 import os
 import pickle
+import sys
+import unittest
 from unittest.mock import patch
 
 import yaml
@@ -171,6 +173,20 @@ some_custom_config: {custom_config}
         # THEN
         self.assertEqual("amazonauth.constants.AuthConstants", config.constants_class)
         self.assertIs(AuthConstants, type(config.constants))
+
+    @unittest.skipIf(sys.platform == "win32", reason="Windows does not support POSIX file permissions")
+    def test_saved_config_is_owner_only(self):
+        # GIVEN
+        config_path = self.given_config_file("max_auth_attempts: 3\n")
+        os.chmod(config_path, 0o644)
+        config = AmazonAuthConfig(config_path=config_path)
+
+        # WHEN
+        config.update_config("otp_secret_key", "test-otp-secret-key")
+
+        # THEN
+        self.assertEqual(0o600, os.stat(config_path).st_mode & 0o777)
+        self.assertEqual([], [name for name in os.listdir(os.path.dirname(config_path)) if name.endswith(".tmp")])
 
     def test_update_config(self):
         # GIVEN

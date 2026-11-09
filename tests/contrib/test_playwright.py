@@ -3,6 +3,7 @@ __license__ = "MIT"
 
 import os
 import sys
+import unittest
 from unittest.mock import call, MagicMock, patch
 
 import responses
@@ -576,6 +577,60 @@ class TestPlaywrightAcicForm(UnitTestCase):
         self.assertEqual("auth-token-value", session_cookies.get("at-main"))
         self.assertEqual("sess-token-value", session_cookies.get("session-token"))
 
+    def test_submit_keeps_secure_and_expiry_of_harvested_cookies(self):
+        # GIVEN
+        form = PlaywrightAcicForm(self.test_config)
+        parsed = BeautifulSoup(self.acic_html, self.test_config.bs4_parser)
+        form.select_form(self.amazon_session, parsed)
+
+        last_response = MagicMock()
+        last_response.url = "https://www.amazon.com/ax/aaut/verify/ap/challenge?aamationToken=test"
+        self.amazon_session.get = MagicMock(return_value="refetched")
+
+        pw_cookies = [
+            {"name": "at-main", "value": "auth-token-value", "domain": ".amazon.com", "path": "/", "secure": True,
+             "expires": 1900000000.5},
+            {"name": "session-id", "value": "sid-value", "domain": ".amazon.com", "path": "/", "secure": False,
+             "expires": -1},
+        ]
+        mock_sync_playwright, _, _, _ = _make_mock_playwright(pw_cookies=pw_cookies)
+
+        # WHEN
+        with patch.dict(sys.modules, {"playwright": MagicMock(),
+                                      "playwright.sync_api": _playwright_module(mock_sync_playwright)}):
+            form.submit(last_response)
+
+        # THEN
+        session_cookies = {c.name: c for c in self.amazon_session.session.cookies}
+        self.assertTrue(session_cookies["at-main"].secure)
+        self.assertEqual(1900000000, session_cookies["at-main"].expires)
+        self.assertFalse(session_cookies["session-id"].secure)
+        self.assertIsNone(session_cookies["session-id"].expires)
+
+    def test_submit_injects_secure_and_expiry_of_session_cookies(self):
+        # GIVEN
+        form = PlaywrightAcicForm(self.test_config)
+        parsed = BeautifulSoup(self.acic_html, self.test_config.bs4_parser)
+        form.select_form(self.amazon_session, parsed)
+        self.amazon_session.session.cookies.set("at-main", "auth-token-value", domain=".amazon.com", path="/",
+                                                secure=True, expires=1900000000)
+
+        last_response = MagicMock()
+        last_response.url = "https://www.amazon.com/ax/aaut/verify/ap/challenge?aamationToken=test"
+        self.amazon_session.get = MagicMock(return_value="refetched")
+        mock_sync_playwright, _, mock_context, _ = _make_mock_playwright()
+
+        # WHEN
+        with patch.dict(sys.modules, {"playwright": MagicMock(),
+                                      "playwright.sync_api": _playwright_module(mock_sync_playwright)}):
+            form.submit(last_response)
+
+        # THEN
+        injected = next(c for call in mock_context.add_cookies.call_args_list for c in call[0][0]
+                        if c["name"] == "at-main")
+        self.assertTrue(injected["secure"])
+        self.assertEqual(1900000000, injected["expires"])
+
     def test_submit_refetches_final_url(self):
         # GIVEN
         form = PlaywrightAcicForm(self.test_config)
@@ -845,6 +900,29 @@ class TestPlaywrightJSAuthForm(UnitTestCase):
         with open(os.path.join(self.RESOURCES_DIR, "auth", "akamai-interstitial.html"),
                   "r", encoding="utf-8") as f:
             self.akamai_html = f.read()
+
+    @unittest.skipIf(sys.platform == "win32", reason="Windows does not support POSIX file permissions")
+    def test_debug_snapshot_is_owner_only(self):
+        # GIVEN
+        form = PlaywrightJSAuthForm(self.test_config)
+        output_dir = os.path.join(self.test_output_dir, "snapshots")
+        page = MagicMock()
+        page.content.return_value = "<html></html>"
+
+        def write_world_readable_screenshot(path):
+            with open(path, "wb") as f:
+                f.write(b"png")
+            os.chmod(path, 0o644)
+
+        page.screenshot.side_effect = write_world_readable_screenshot
+
+        # WHEN
+        form._save_debug_snapshot(page, output_dir, "browser-challenge")
+
+        # THEN
+        self.assertEqual(0o700, os.stat(output_dir).st_mode & 0o777)
+        self.assertEqual(0o600, os.stat(os.path.join(output_dir, "browser-challenge.png")).st_mode & 0o777)
+        self.assertEqual(0o600, os.stat(os.path.join(output_dir, "browser-challenge.html")).st_mode & 0o777)
 
     def test_select_form_detects_js_robot_challenge(self):
         # GIVEN
@@ -1168,7 +1246,7 @@ class TestPlaywrightBrowserLogin(UnitTestCase):
     def test_login_signs_in_in_a_browser_window(self, mock_has_display):
         # GIVEN
         mock_sync_playwright, mock_page, mock_context, mock_browser = _make_mock_playwright(
-            pw_cookies=[{"name": "x-main", "value": "signed-in", "domain": ".amazon.com", "path": "/"},
+            pw_cookies=[{"name": "x-main", "value": "signed-in", "domain": ".amazon.com", "path": "/", "secure": True},
                         {"name": "other", "value": "elsewhere", "domain": ".example.com", "path": "/"}])
         amazon_session = AmazonSession(config=self.test_config)
         amazon_session.io = MagicMock()
@@ -1189,6 +1267,7 @@ class TestPlaywrightBrowserLogin(UnitTestCase):
         amazon_session.io.echo.assert_called_once_with("Info: A browser window has opened. Sign in to Amazon there, "
                                                        "and this will continue once you're signed in.")
         self.assertEqual({"x-main": "signed-in"}, amazon_session.session.cookies.get_dict())
+        self.assertTrue(all(cookie.secure for cookie in amazon_session.session.cookies))
         mock_browser.close.assert_called_once_with()
         mock_verify_session.assert_called_once_with()
 
