@@ -5,7 +5,7 @@ import inspect
 import logging
 import os
 import threading
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Optional, Set, Union
 from urllib.parse import urlparse
 
 import yaml
@@ -67,6 +67,7 @@ class AmazonAuthConfig:
         self._environment: Dict[str, Any] = self.read_environment()
         self._resolved_classes: Dict[str, Any] = {}
         self._assigned_classes: Dict[str, Any] = {}
+        self._unavailable_class_paths: Set[str] = set()
 
         with config_file_lock:
             if os.path.exists(self.config_path):
@@ -174,10 +175,35 @@ class AmazonAuthConfig:
         Instantiate the constants and selectors, which the auth layer itself uses and so are always
         needed. The entity, output, and Transactions page classes resolve on first use instead.
         """
-        selectors_class_split = self._class_path("selectors_class").split(".")
-
         self.constants = self._instantiate_constants()
-        self.selectors = util.load_class(selectors_class_split[:-1], selectors_class_split[-1])()
+        self.selectors = self._load_configured_class("selectors_class")()
+
+    def _load_configured_class(self,
+                               key: str) -> Any:
+        """
+        Load the class the given config key names. The config file can be shared with other packages built on this
+        one, which save their own class paths to it, so a class whose package isn't installed here falls back to the
+        default, with a warning. Any other failure to load it is raised.
+
+        :param key: The config key naming the class.
+        :return: The class.
+        """
+        class_path = self._class_path(key)
+        module_path, class_name = class_path.rsplit(".", 1)
+        try:
+            return util.load_class(module_path.split("."), class_name)
+        except ModuleNotFoundError as e:
+            default_class_path = self._default_data()[key]
+            if (class_path == default_class_path or not e.name or
+                    not (module_path == e.name or module_path.startswith(f"{e.name}."))):
+                raise
+
+            if class_path not in self._unavailable_class_paths:
+                self._unavailable_class_paths.add(class_path)
+                logger.warning(f"Configured {key} '{class_path}' is unavailable, since '{e.name}' isn't installed; "
+                               f"using the default '{default_class_path}'.")
+            default_module_path, default_class_name = default_class_path.rsplit(".", 1)
+            return util.load_class(default_module_path.split("."), default_class_name)
 
     def _validate_class_paths(self) -> None:
         """
@@ -209,8 +235,7 @@ class AmazonAuthConfig:
             source["bs4_parser"] = "html.parser"
 
     def _instantiate_constants(self) -> Any:
-        constants_class_split = self._class_path("constants_class").split(".")
-        constants_cls = util.load_class(constants_class_split[:-1], constants_class_split[-1])
+        constants_cls = self._load_configured_class("constants_class")
         # Pass ``self`` only when the constants class accepts a config arg, to keep backward
         # compatibility with existing zero-arg ``constants_class`` subclasses.
         init_params = inspect.signature(constants_cls.__init__).parameters
@@ -283,6 +308,7 @@ class AmazonAuthConfig:
         self.__dict__.update(state)
         self.__dict__.setdefault("_environment", {})
         self._resolved_classes = {}
+        self._unavailable_class_paths = set()
         self._load_classes()
 
     def update_config(self,
@@ -302,6 +328,9 @@ class AmazonAuthConfig:
         try:
             self._validate_bs4_parser()
             self._validate_class_paths()
+            if key in ("constants_class", "selectors_class"):
+                module_path, class_name = self._class_path(key).rsplit(".", 1)
+                util.load_class(module_path.split("."), class_name)
             self._load_classes()
         except (AmazonAuthError, AttributeError, ImportError):
             self._data = previous_data

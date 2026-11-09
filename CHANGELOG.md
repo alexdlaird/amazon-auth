@@ -4,7 +4,14 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased](https://github.com/alexdlaird/amazon-auth/compare/0.2.0...HEAD)
+## [Unreleased](https://github.com/alexdlaird/amazon-auth/compare/0.2.1...HEAD)
+
+## [0.2.1](https://github.com/alexdlaird/amazon-auth/compare/0.2.0...0.2.1) - 2026-11-09
+
+### Fixed
+
+- `PlaywrightBrowserLogin.login()` no longer fails with `AttributeError` once sign-in completes in the browser, when used without `amazon-orders`. It verified the session against an `amazon-orders`-only URL.
+- A config file whose `constants_class` or `selectors_class` names a package that isn't installed (for instance, one saved by `amazon-orders`, which shares the config file) falls back to the default class with a warning, instead of failing with `ModuleNotFoundError`.
 
 ## [0.2.0](https://github.com/alexdlaird/amazon-auth/compare/0.1.1...0.2.0) - 2026-11-09
 

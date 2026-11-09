@@ -979,7 +979,7 @@ class PlaywrightBrowserLogin:
 
     def _verify_session(self) -> None:
         try:
-            response = self.amazon_session.get(self.config.constants.ORDER_HISTORY_URL, persist_cookies=True)
+            response = self.amazon_session.get(self.config.constants.SESSION_CHECK_URL, persist_cookies=True)
             self.amazon_session.check_response(response)
         except AmazonAuthRedirectError as e:
             self.amazon_session.logout()

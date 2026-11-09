@@ -5,6 +5,7 @@ import os
 import sys
 from unittest.mock import call, MagicMock, patch
 
+import responses
 from bs4 import BeautifulSoup
 
 from amazonauth.conf import AmazonAuthConfig
@@ -19,6 +20,7 @@ from amazonauth.contrib.waf.base import AwsWafForm
 from amazonauth.exception import (
     AmazonAuthBrowserNotInstalledError,
     AmazonAuthError,
+    AmazonAuthSignInError,
     AmazonAuthWafSolverError,
 )
 from amazonauth.session import AmazonSession
@@ -1232,6 +1234,37 @@ class TestPlaywrightBrowserLogin(UnitTestCase):
                           ("wait_for_sign_in", custom_context, mock_page, 42)], hook_calls)
         amazon_session.io.echo.assert_not_called()
         custom_context.cookies.assert_called_once_with()
+
+    @responses.activate
+    def test_verify_session_accepts_session(self):
+        # GIVEN
+        session_check_response = self.given_session_check_page_exists()
+        browser_login = PlaywrightBrowserLogin(AmazonSession(config=self.test_config))
+
+        # WHEN
+        browser_login._verify_session()
+
+        # THEN
+        self.assertEqual(1, session_check_response.call_count)
+        self.assertTrue(browser_login.amazon_session.is_authenticated)
+
+    @responses.activate
+    def test_verify_session_rejected_logs_out(self):
+        # GIVEN
+        auth_redirect_response = self.given_authenticated_url_redirects_to_login()
+        self.given_login_responses_success()
+        signout_response = self.given_logout_response_success()
+        browser_login = PlaywrightBrowserLogin(AmazonSession(config=self.test_config))
+
+        # WHEN
+        with self.assertRaises(AmazonAuthSignInError) as cm:
+            browser_login._verify_session()
+
+        # THEN
+        self.assertIn("Amazon did not accept the browser's session", str(cm.exception))
+        self.assertEqual(1, auth_redirect_response.call_count)
+        self.assertEqual(1, signout_response.call_count)
+        self.assertFalse(browser_login.amazon_session.is_authenticated)
 
     def test_wait_for_sign_in_returns_once_signed_in(self):
         # GIVEN
