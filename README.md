@@ -56,6 +56,12 @@ PlaywrightBrowserLogin(amazon_session).login()
 
 The session is persisted, so `AmazonSession().login()` reuses it without credentials.
 
+### Building on `amazon-auth`
+
+`amazon-auth` is meant to be built on: packages that read more of Amazon's website, like
+[`amazon-orders`](https://amazon-orders.readthedocs.io), subclass its config, session, constants and selectors, and
+register its CLI commands. See [Building on `amazon-auth`](https://amazon-auth.readthedocs.io/downstream.html).
+
 ## Documentation
 
 For more advanced usage, `amazon-auth`'s official documentation is available
