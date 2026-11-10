@@ -44,21 +44,30 @@ class AwsWafForm(AuthForm):
     def __init__(self,
                  config: AmazonAuthConfig) -> None:
         super().__init__(config, selector=None)
-        config_key = self.API_KEY_ENV_VAR.lower()
-        api_key = (os.environ.get(self.API_KEY_ENV_VAR)
-                   or getattr(config, config_key, None)
-                   or "")
-        if not api_key:
+        self._api_key: str = (os.environ.get(self.API_KEY_ENV_VAR)
+                              or getattr(config, self.API_KEY_ENV_VAR.lower(), None)
+                              or "")
+        self._goku: Optional[Dict[str, Any]] = None
+        self._challenge_script: Optional[str] = None
+
+    @property
+    def api_key(self) -> str:
+        """
+        The third-party solver API key. Resolved (in order of precedence) from the :attr:`API_KEY_ENV_VAR`
+        environment variable, then from the lowercase config key of the same name on
+        :class:`~amazonauth.conf.AmazonAuthConfig`. It's only required to solve a challenge, so a solver configured
+        without one doesn't keep a session from being created.
+
+        :raises AmazonAuthError: if neither is set.
+        """
+        if not self._api_key:
+            config_key = self.API_KEY_ENV_VAR.lower()
             raise AmazonAuthError(
                 f"{type(self).__name__} requires the {self.API_KEY_ENV_VAR} "
                 f"environment variable, or the {config_key} config key, to be set."
             )
-        #: The third-party solver API key. Resolved (in order of precedence) from the
-        #: :attr:`API_KEY_ENV_VAR` environment variable, then from the lowercase config key
-        #: of the same name on :class:`~amazonauth.conf.AmazonAuthConfig`.
-        self.api_key: str = api_key
-        self._goku: Optional[Dict[str, Any]] = None
-        self._challenge_script: Optional[str] = None
+
+        return self._api_key
 
     def select_form(self,
                     amazon_session: "AmazonSession",
