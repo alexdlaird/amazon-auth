@@ -22,9 +22,9 @@ installing an extra name your package:
         PACKAGE_NAME = "my-package"
 
         @staticmethod
-        def _default_data():
+        def default_data():
             return {
-                **AmazonAuthConfig._default_data(),
+                **AmazonAuthConfig.default_data(),
                 "constants_class": "mypackage.constants.Constants",
                 "selectors_class": "mypackage.selectors.Selectors",
                 "page_size": 20,

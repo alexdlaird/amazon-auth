@@ -389,3 +389,28 @@ some_custom_config: {custom_config}
 
         # THEN
         self.assertEqual("/some/cookies.json", config.cookie_jar_path)
+
+    def test_downstream_config_adds_its_own_defaults(self):
+        # WHEN
+        config = DownstreamConfig(data={})
+
+        # THEN
+        self.assertEqual(20, config.page_size)
+        self.assertEqual(AmazonAuthConfig.default_data()["max_auth_attempts"], config.max_auth_attempts)
+
+    def test_downstream_config_reads_its_own_default_key_from_the_environment_as_yaml(self):
+        # WHEN
+        with patch.dict(os.environ, {"AMAZON_PAGE_SIZE": "30"}):
+            config = DownstreamConfig(data={})
+
+        # THEN
+        self.assertEqual(30, config.page_size)
+
+
+class DownstreamConfig(AmazonAuthConfig):
+    @staticmethod
+    def default_data():
+        return {
+            **AmazonAuthConfig.default_data(),
+            "page_size": 20,
+        }
