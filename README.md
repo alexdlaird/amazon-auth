@@ -9,7 +9,7 @@
 
 `amazon-auth` is an unofficial library that signs in to Amazon's consumer website (amazon.com and other Amazon sites)
 and persists the session, so it can be reused from Python. It handles sign-in, OTP and MFA, challenges, and browser
-sign-in. [`amazon-orders`](https://github.com/alexdlaird/amazon-orders) is built on it.
+sign-in.
 
 > **Note:** This package works by parsing Amazon's consumer-facing website. As Amazon provides no official API to use,
 > older versions of this package may break at any time, so it's recommended that you use the latest version.
