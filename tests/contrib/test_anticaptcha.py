@@ -23,14 +23,15 @@ class TestAntiCaptchaWafForm(UnitTestCase):
                   "r", encoding="utf-8") as f:
             self.waf_html = f.read()
 
-    def test_init_missing_env_var_raises(self):
+    def test_missing_api_key_raises_when_used(self):
         with patch.dict(os.environ):
             # GIVEN
             os.environ.pop("ANTICAPTCHA_API_KEY", None)
+            form = AntiCaptchaWafForm(self.test_config)
 
             # WHEN / THEN
             with self.assertRaises(AmazonAuthError) as cm:
-                AntiCaptchaWafForm(self.test_config)
+                form.api_key
             self.assertIn("ANTICAPTCHA_API_KEY", str(cm.exception))
 
     @patch.dict(os.environ, {"ANTICAPTCHA_API_KEY": "test-api-key"})

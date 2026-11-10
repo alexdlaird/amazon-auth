@@ -4,7 +4,13 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased](https://github.com/alexdlaird/amazon-auth/compare/0.2.3...HEAD)
+## [Unreleased](https://github.com/alexdlaird/amazon-auth/compare/0.2.4...HEAD)
+
+## [0.2.4](https://github.com/alexdlaird/amazon-auth/compare/0.2.3...0.2.4) - 2026-11-10
+
+### Fixed
+
+- Bug fixes and stability improvements.
 
 ## [0.2.3](https://github.com/alexdlaird/amazon-auth/compare/0.2.2...0.2.3) - 2026-11-09
 
