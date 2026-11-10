@@ -59,7 +59,8 @@ Constants and Selectors
 
 Subclass :class:`~amazonauth.constants.AuthConstants` for your package's URLs and formats, and
 :class:`~amazonauth.selectors.AuthSelectors` for its CSS selectors, and name them as the defaults in your config (see
-`Config`_). URLs that depend on the Amazon site go in ``_apply_domain()``, after ``amazon-auth``'s own:
+`Config`_). URLs that depend on the Amazon site go in
+:func:`~amazonauth.constants.AuthConstants.apply_domain`, after ``amazon-auth``'s own:
 
 .. code:: python
 
@@ -69,8 +70,8 @@ Subclass :class:`~amazonauth.constants.AuthConstants` for your package's URLs an
     class Constants(AuthConstants):
         SUBSCRIPTIONS_URL = f"{AuthConstants.BASE_URL}/subscriptions"
 
-        def _apply_domain(self, domain):
-            super()._apply_domain(domain)
+        def apply_domain(self, domain):
+            super().apply_domain(domain)
             self.SUBSCRIPTIONS_URL = f"{self.BASE_URL}/subscriptions"
 
 Command Line Interfaces

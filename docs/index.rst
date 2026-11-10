@@ -43,7 +43,6 @@ Amazon Auth - Sign in to Amazon's consumer website from Python
 
 ``amazon-auth`` is an unofficial library that signs in to Amazon's consumer website and persists the session, so it
 can be reused from Python. It handles sign-in, OTP and MFA, challenges, and browser sign-in.
-|amazon-orders|_ is built on it.
 
 .. note::
 
@@ -177,14 +176,14 @@ directory, and every other site's beside it, named for the site (e.g. ``cookies.
 ``--domain amazon.de`` leaves the ``amazon.com`` session as it is. An explicit ``cookie_jar_path`` is used for every
 site.
 
+A ``domain`` can be any of these Amazon sites:
+
+.. supported-sites::
+
 Known Limitations
 -----------------
 
 - Amazon Business accounts are not supported
-- Device not remembered for OTP
-    - Amazon will sometimes re-prompt for OTP even when a device has been remembered.
-    - The recommended workaround for this is persisting the :attr:`~amazonauth.session.AmazonSession.otp_secret_key`
-      in the config or the environment so that re-prompts are auto-solved.
 
 Dive Deeper
 ===========

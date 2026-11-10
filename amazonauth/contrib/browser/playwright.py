@@ -18,6 +18,7 @@ from requests import Response
 
 from amazonauth.conf import AmazonAuthConfig
 from amazonauth.exception import (
+    AmazonAuthChallengeUnsolvedError,
     AmazonAuthSignInError,
     AmazonAuthRedirectError,
     AmazonAuthBrowserNotInstalledError,
@@ -210,9 +211,8 @@ class PlaywrightBrowserLauncher:
 
 class PlaywrightAuthForm(AuthForm):
     """
-    Shared base for Playwright-based JavaScript challenge solvers. Subclasses implement
-    :func:`~amazonauth.forms.AuthForm.select_form` to detect the challenge page and :func:`_is_challenge_url` to
-    signal when navigation has completed.
+    Shared base for Playwright-based JavaScript challenge solvers. Subclasses detect the challenge page with
+    :func:`~amazonauth.forms.AuthForm.select_form`, and say when the browser has navigated past it.
 
     This base class handles the Playwright browser lifecycle, bidirectional cookie bridging
     between :mod:`requests` and the Playwright browser context, and re-fetching the final
@@ -238,6 +238,15 @@ class PlaywrightAuthForm(AuthForm):
         """JavaScript challenge pages have no ``<form>`` to populate; no-op override."""
         pass
 
+    def check_available(self) -> None:
+        """
+        Check that this form can handle a challenge here. Every form can, unless it needs something this machine
+        doesn't have.
+
+        :raises AmazonAuthChallengeUnsolvedError: if it can't.
+        """
+        pass
+
     def submit(self,
                last_response: Response) -> AmazonSessionResponse:
         """
@@ -251,11 +260,15 @@ class PlaywrightAuthForm(AuthForm):
         :raises AmazonAuthError: if the ``playwright`` package is not installed, if
             :func:`~amazonauth.forms.AuthForm.select_form` was not called first, or if the challenge does not resolve
             within the timeout.
+        :raises AmazonAuthChallengeUnsolvedError: if this form can't handle the challenge here (see
+            :func:`check_available`).
         """
         if not self.amazon_session:
             raise AmazonAuthError(
                 "Call PlaywrightAuthForm.select_form() first."
             )  # pragma: no cover
+
+        self.check_available()
 
         try:
             from playwright.sync_api import (  # type: ignore[import-not-found]
@@ -380,14 +393,10 @@ class PlaywrightAcicForm(PlaywrightAuthForm):
     """
     Handles Amazon's ACIC (Amazon Challenge and Identity Component) JavaScript challenge
     by running it in a headless browser. If an embedded AWS WAF challenge or visual grid
-    Puzzle is present on the ACIC page, it will be solved automatically using the first
-    :class:`~amazonauth.contrib.waf.base.AwsWafForm` found in ``auth_forms_classes``.
-
-    If no automated solver is registered but a manual solver
-    (:class:`~amazonauth.contrib.browser.playwright.PlaywrightManualWafForm`) is, a
-    **visible** browser window is opened instead so the user can solve the embedded
-    challenge themselves, for free. An automated solver takes precedence when both are
-    registered.
+    Puzzle is present on the ACIC page, it's passed to the solvers registered in ``auth_forms_classes``, in the order
+    they're listed: a :class:`~amazonauth.contrib.waf.base.AwsWafForm`, or
+    :class:`~amazonauth.contrib.browser.playwright.PlaywrightManualWafForm`, which opens a **visible** browser window
+    so the user can solve it themselves. If one can't, the next one is tried.
 
     Detects the challenge via the ``#aa-challenge-page-captcha-container`` element and
     waits for navigation away from ``/ax/aaut/verify/ap/challenge``.
@@ -395,6 +404,12 @@ class PlaywrightAcicForm(PlaywrightAuthForm):
     Register by adding ``amazonauth.contrib.browser.playwright.PlaywrightAcicForm`` to ``auth_forms_classes`` in
     :class:`~amazonauth.conf.AmazonAuthConfig`.
     """
+
+    def __init__(self,
+                 config: AmazonAuthConfig) -> None:
+        super().__init__(config)
+        self._solver: Optional[AuthForm] = None
+        self._fallback_remains: bool = False
 
     def select_form(self,
                     amazon_session: "AmazonSession",
@@ -408,41 +423,67 @@ class PlaywrightAcicForm(PlaywrightAuthForm):
         :return: ``True`` if an ACIC challenge was detected, ``False`` otherwise.
         """
         self.amazon_session = amazon_session
-        detected = bool(parsed.select_one(self.config.selectors.ACIC_CHALLENGE_SELECTOR))
-        if detected:
-            self.headless = not self._manual_mode()
-        return detected
+        return bool(parsed.select_one(self.config.selectors.ACIC_CHALLENGE_SELECTOR))
 
-    def _manual_mode(self) -> bool:
+    def submit(self,
+               last_response: Response) -> AmazonSessionResponse:
         """
-        Return ``True`` if the embedded challenge should be handed off to a human in a
-        visible browser window rather than an automated solver. This is the case when a
-        manual solver form is registered and no automated :class:`~amazonauth.contrib.waf.base.AwsWafForm` is; an
-        automated solver takes precedence when both are present, since it is
-        non-interactive.
-        """
-        return self._find_manual_solver() is not None and self._find_waf_solver() is None
+        Pass the ACIC challenge to each registered solver in turn, in the order they're listed, until one handles it,
+        as :func:`PlaywrightAuthForm.submit` does with one.
 
-    def _find_waf_solver(self) -> Optional["AwsWafForm"]:
+        :param last_response: The response that returned the ACIC challenge page.
+        :return: The :class:`~amazonauth.util.AmazonSessionResponse` from re-fetching the URL after the challenge
+            resolves.
+        :raises AmazonAuthError: if the ``playwright`` package is not installed, or if the challenge does not
+            resolve within the timeout.
+        :raises AmazonAuthChallengeUnsolvedError: if the last solver can't solve it.
+        """
+        solvers = self._available_solvers()
+        for index, solver in enumerate(solvers):
+            self._solver = solver
+            self._fallback_remains = index < len(solvers) - 1
+            self.headless = not isinstance(solver, PlaywrightAuthForm)
+            try:
+                return super().submit(last_response)
+            except AmazonAuthChallengeUnsolvedError as e:
+                if not self._fallback_remains:
+                    raise
+                logger.debug(f"{type(solver).__name__} couldn't solve the ACIC challenge, trying the next solver: {e}")
+
+        self._solver = None
+        self.headless = True
+        return super().submit(last_response)
+
+    def _available_solvers(self) -> List[AuthForm]:
         if not self.amazon_session:
-            return None  # pragma: no cover
+            return []  # pragma: no cover
         from amazonauth.contrib.waf.base import AwsWafForm
-        return next(
-            (f for f in self.amazon_session.auth_forms if isinstance(f, AwsWafForm)),
-            None,
-        )
 
-    def _find_manual_solver(self) -> Optional["PlaywrightAuthForm"]:
-        if not self.amazon_session:
-            return None  # pragma: no cover
-        return next(
-            (f for f in self.amazon_session.auth_forms
-             if isinstance(f, PlaywrightAuthForm) and f.manual),
-            None,
-        )
+        solvers: List[AuthForm] = []
+        for form in self.amazon_session.auth_forms:
+            if not (isinstance(form, AwsWafForm) or (isinstance(form, PlaywrightAuthForm) and form.manual)):
+                continue
+            try:
+                form.check_available()
+                solvers.append(form)
+            except AmazonAuthChallengeUnsolvedError as e:
+                logger.debug(f"{type(form).__name__} can't solve the ACIC challenge here: {e}")
+
+        return solvers
+
+    def _unsolved_if_fallback_remains(self,
+                                      error: Exception) -> None:
+        if self._fallback_remains:
+            raise AmazonAuthChallengeUnsolvedError(str(error), meta=getattr(error, "meta", None)) from error
 
     def _on_challenge_page(self, page: Any, context: Any, output_dir: Optional[str]) -> None:
-        if self._manual_mode():
+        from amazonauth.contrib.waf.base import AwsWafForm
+
+        solver = self._solver
+        if solver is None:
+            return
+
+        if not isinstance(solver, AwsWafForm):
             message = (
                 "Info: A browser window has opened — solve the challenge, then return "
                 "here when done."
@@ -457,25 +498,30 @@ class PlaywrightAcicForm(PlaywrightAuthForm):
         while solves < max_solves:
             if not self._is_challenge_url(page.url, page.url):
                 break
-            if self._try_solve_embedded_waf(page, context, output_dir):
+            if self._try_solve_embedded_waf(solver, page, context, output_dir):
                 solves += 1
-            elif self._try_solve_visual_captcha(page, context, output_dir):
+            elif self._try_solve_visual_captcha(solver, page, context, output_dir):
                 solves += 1
             else:
                 break
 
-    def _try_solve_embedded_waf(self, page: Any, context: Any, output_dir: Optional[str]) -> bool:
+    def _try_solve_embedded_waf(self,
+                                waf_form: "AwsWafForm",
+                                page: Any,
+                                context: Any,
+                                output_dir: Optional[str]) -> bool:
         """
-        If the ACIC challenge page contains an embedded AWS WAF challenge, solve it
-        using the first :class:`~amazonauth.contrib.waf.base.AwsWafForm` found in
-        ``amazon_session.auth_forms``, inject the resulting ``aws-waf-token`` cookie
+        If the ACIC challenge page contains an embedded AWS WAF challenge, pass it to the current
+        :class:`~amazonauth.contrib.waf.base.AwsWafForm` solver, inject the resulting ``aws-waf-token`` cookie
         into the browser context, and reload the page.
 
+        :param waf_form: The solver to pass the challenge to.
         :param page: The Playwright ``Page`` on the ACIC challenge URL.
         :param context: The Playwright ``BrowserContext``.
         :param output_dir: Directory for debug snapshots, or ``None``.
         :return: ``True`` if a WAF token was obtained and injected, ``False`` otherwise.
-        :raises AmazonAuthWafSolverError: If the WAF solver fails.
+        :raises AmazonAuthChallengeUnsolvedError: if the solver fails, or can't solve it and another solver is
+            registered after it.
         """
         try:
             from playwright.sync_api import TimeoutError as PlaywrightTimeoutError  # type: ignore[import-not-found]
@@ -507,16 +553,12 @@ class PlaywrightAcicForm(PlaywrightAuthForm):
         if not self.amazon_session:
             return False  # pragma: no cover
 
-        waf_form = self._find_waf_solver()
-        if not waf_form:
-            logger.debug("No AwsWafForm configured, skipping WAF challenge.")
-            return False
-
         try:
             token = waf_form.solve_token(page.url, goku, challenge_script)
         except AmazonAuthWafSolverError:
             raise
-        except Exception:
+        except Exception as e:
+            self._unsolved_if_fallback_remains(e)
             logger.info("WAF solver failed to solve embedded WAF challenge.", exc_info=True)
             return False
 
@@ -535,18 +577,24 @@ class PlaywrightAcicForm(PlaywrightAuthForm):
         self._save_debug_snapshot(page, output_dir, "browser-waf-injected")
         return True
 
-    def _try_solve_visual_captcha(self, page: Any, context: Any, output_dir: Optional[str]) -> bool:
+    def _try_solve_visual_captcha(self,
+                                  waf_form: "AwsWafForm",
+                                  page: Any,
+                                  context: Any,
+                                  output_dir: Optional[str]) -> bool:
         """
         If the ACIC challenge page contains a visual grid Puzzle rendered by
         ``CaptchaScript.renderCaptcha``, extract the challenge images and question,
-        solve it via the configured :class:`~amazonauth.contrib.waf.base.AwsWafForm`,
+        pass it to the current :class:`~amazonauth.contrib.waf.base.AwsWafForm` solver,
         and submit the answer.
 
+        :param waf_form: The solver to pass the Puzzle to.
         :param page: The Playwright ``Page`` on the ACIC challenge URL.
         :param context: The Playwright ``BrowserContext``.
         :param output_dir: Directory for debug snapshots, or ``None``.
         :return: ``True`` if the Puzzle was solved and submitted, ``False`` otherwise.
-        :raises AmazonAuthWafSolverError: If the WAF solver fails.
+        :raises AmazonAuthChallengeUnsolvedError: if the solver fails, or can't solve it and another solver is
+            registered after it.
         """
         try:
             from playwright.sync_api import TimeoutError as PlaywrightTimeoutError  # type: ignore[import-not-found]
@@ -563,11 +611,6 @@ class PlaywrightAcicForm(PlaywrightAuthForm):
 
         if not self.amazon_session:
             return False  # pragma: no cover
-
-        waf_form = self._find_waf_solver()
-        if not waf_form:
-            logger.debug("No AwsWafForm configured, skipping Puzzle.")
-            return False
 
         question_selector = self.config.selectors.ACIC_VISUAL_CAPTCHA_QUESTION_SELECTOR
         try:
@@ -603,12 +646,15 @@ class PlaywrightAcicForm(PlaywrightAuthForm):
             answer = waf_form.solve_visual_captcha(page.url, challenge_images, question)
         except AmazonAuthWafSolverError:
             raise
-        except Exception:
+        except Exception as e:
+            self._unsolved_if_fallback_remains(e)
             logger.info("WAF solver failed to solve Puzzle.", exc_info=True)
             return False
 
         if answer is None:
-            logger.info(f"{waf_form.PROVIDER_NAME} does not support Puzzle solving.")
+            message = f"{waf_form.PROVIDER_NAME} does not support Puzzle solving."
+            self._unsolved_if_fallback_remains(AmazonAuthError(message))
+            logger.info(message)
             return False
 
         message = f"Info: Puzzle answered via {waf_form.PROVIDER_NAME}."
@@ -755,6 +801,16 @@ class PlaywrightManualWafForm(PlaywrightAuthForm):
         super().__init__(config)
         self.headless = False
         self.manual = True
+
+    def check_available(self) -> None:
+        """
+        Check that a browser window can be opened here, as solving a challenge with this form needs.
+
+        :raises AmazonAuthChallengeUnsolvedError: if this machine doesn't have a display.
+        """
+        if not has_display():
+            raise AmazonAuthChallengeUnsolvedError(f"{type(self).__name__} requires a display to open a browser "
+                                                   f"window, and this machine doesn't have one.")
 
     def select_form(self,
                     amazon_session: "AmazonSession",

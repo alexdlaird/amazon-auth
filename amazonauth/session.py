@@ -14,7 +14,8 @@ from requests import Response, Session
 from requests.utils import dict_from_cookiejar
 
 from amazonauth.conf import AmazonAuthConfig, cookies_file_lock, debug_output_file_lock
-from amazonauth.exception import AmazonAuthSignInError, AmazonAuthError, AmazonAuthRedirectError
+from amazonauth.exception import (AmazonAuthSignInError, AmazonAuthError, AmazonAuthRedirectError,
+                                  AmazonAuthChallengeUnsolvedError)
 from amazonauth.forms import (AuthForm, AcicAuthBlocker, CaptchaForm, JSAuthBlocker, MfaDeviceSelectForm, MfaForm,
                               SignInForm, ClaimForm, IntentForm, PasskeyForm)
 from amazonauth.util import AmazonSessionResponse, load_class, make_private_dirs, select_one, write_private_file
@@ -567,10 +568,21 @@ class AmazonSession:
 
     def _process_forms(self,
                        last_response: AmazonSessionResponse) -> Optional[AmazonSessionResponse]:
+        unsolved: Optional[AmazonAuthChallengeUnsolvedError] = None
         for form in self.auth_forms:
+            # Once a form couldn't solve the challenge, its error is the one to raise, not a blocker's generic one
+            if unsolved and isinstance(form, (AcicAuthBlocker, JSAuthBlocker)):
+                continue
             if form.select_form(self, last_response.parsed):
-                form.fill_form()
-                return form.submit(last_response.response)
+                try:
+                    form.fill_form()
+                    return form.submit(last_response.response)
+                except AmazonAuthChallengeUnsolvedError as e:
+                    logger.debug(f"{type(form).__name__} couldn't solve the challenge, trying the next form: {e}")
+                    unsolved = e
+
+        if unsolved:
+            raise unsolved
 
         return None
 

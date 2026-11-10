@@ -12,7 +12,7 @@ from bs4 import Tag
 from requests import Response
 
 from amazonauth.conf import AmazonAuthConfig
-from amazonauth.exception import AmazonAuthError
+from amazonauth.exception import AmazonAuthChallengeUnsolvedError, AmazonAuthError
 from amazonauth.forms import AuthForm
 from amazonauth.util import AmazonSessionResponse
 
@@ -58,16 +58,22 @@ class AwsWafForm(AuthForm):
         :class:`~amazonauth.conf.AmazonAuthConfig`. It's only required to solve a challenge, so a solver configured
         without one doesn't keep a session from being created.
 
-        :raises AmazonAuthError: if neither is set.
+        :raises AmazonAuthChallengeUnsolvedError: if neither is set.
         """
-        if not self._api_key:
-            config_key = self.API_KEY_ENV_VAR.lower()
-            raise AmazonAuthError(
-                f"{type(self).__name__} requires the {self.API_KEY_ENV_VAR} "
-                f"environment variable, or the {config_key} config key, to be set."
-            )
+        self.check_available()
 
         return self._api_key
+
+    def check_available(self) -> None:
+        """
+        Check that this solver can solve a challenge here, which needs its :attr:`api_key`.
+
+        :raises AmazonAuthChallengeUnsolvedError: if its API key isn't set.
+        """
+        if not self._api_key:
+            raise AmazonAuthChallengeUnsolvedError(f"{type(self).__name__} requires the {self.API_KEY_ENV_VAR} "
+                                                   f"environment variable, or the {self.API_KEY_ENV_VAR.lower()} "
+                                                   f"config key, to be set.")
 
     def select_form(self,
                     amazon_session: "AmazonSession",
@@ -117,12 +123,14 @@ class AwsWafForm(AuthForm):
         :return: The :class:`~amazonauth.util.AmazonSessionResponse` from
             re-fetching the URL after the cookie is set.
         :raises AmazonAuthError: if :func:`~amazonauth.forms.AuthForm.select_form` was not called first.
+        :raises AmazonAuthChallengeUnsolvedError: if its API key isn't set, or the solver fails.
         """
         if not self.amazon_session or self._goku is None or self._challenge_script is None:
             raise AmazonAuthError(
                 "Call AwsWafForm.select_form() first."
             )  # pragma: no cover
 
+        self.check_available()
         token = self.solve_token(last_response.url, self._goku, self._challenge_script)
 
         # Always surface that a paid third-party service was used, regardless of debug mode.
@@ -147,8 +155,7 @@ class AwsWafForm(AuthForm):
         set on the session.
 
         :param url: The URL of the WAF-challenged page.
-        :param goku: The parsed ``window.gokuProps`` payload (typically contains
-            ``key``, ``iv``, and ``context``).
+        :param goku: The parsed ``window.gokuProps`` payload.
         :param challenge_script: The ``src`` of the AWS WAF ``challenge.js``
             script tag from the challenge page.
         :return: The ``aws-waf-token`` cookie value.
@@ -165,7 +172,7 @@ class AwsWafForm(AuthForm):
         and return the indices of the correct grid cells.
 
         :param url: The URL of the page containing the Puzzle.
-        :param image_data: List of base64-encoded data URLs, one per grid tile.
+        :param image_data: The Puzzle's grid tiles, as base64-encoded images.
         :param question: The object to identify (e.g. ``"the buckets"``).
         :return: A list of zero-based grid cell indices to select, or ``None`` if
             this solver does not support Puzzle classification.

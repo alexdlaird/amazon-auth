@@ -15,7 +15,12 @@ import sys
 sys.path.insert(0, os.path.abspath(".."))
 
 # These imports must happen after adding to sys.path so docs build is consistent across environments
+from docutils import nodes
+from docutils.statemachine import StringList
+from sphinx.util.docutils import SphinxDirective
+
 from amazonauth import __version__
+from amazonauth.region_data import REGION_SITES
 
 # -- Project information -----------------------------------------------------
 
@@ -86,6 +91,8 @@ ogp_custom_meta_tags = [
     '<meta name="twitter:card" content="summary_large_image">',
 ]
 
+google_analytics_id = "G-NTEZDDWZYR"
+
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
@@ -121,6 +128,7 @@ html_theme_options = {
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ["_static"]
+html_context = {"google_analytics_id": google_analytics_id}
 html_extra_path = ["_html"]
 
 html_css_files = [
@@ -243,6 +251,23 @@ rst_epilog = """
 
 # -- Generated content -------------------------------------------------------
 
+class SupportedSitesDirective(SphinxDirective):
+    """
+    Render the Amazon sites ``amazon-auth`` signs in to, built from its region data, so the docs always match the
+    code.
+    """
+
+    def run(self):
+        rows = [".. list-table::", "   :header-rows: 1", "", "   * - Site", "     - English"]
+        for tld, site in sorted(REGION_SITES.items()):
+            rows += [f"   * - amazon.{tld}",
+                     f"     - {site.english_locale.replace('_', '-') if site.english_locale else '—'}"]
+
+        container = nodes.container()
+        self.state.nested_parse(StringList(rows), self.content_offset, container)
+        return container.children
+
+
 def _canonicalize_root_page(app, pagename, templatename, context, doctree):
     if pagename == app.config.root_doc:
         context["pageurl"] = app.config.html_baseurl
@@ -259,5 +284,6 @@ def _canonicalize_root_in_sitemap(app, exception):
 
 
 def setup(app):
+    app.add_directive("supported-sites", SupportedSitesDirective)
     app.connect("html-page-context", _canonicalize_root_page)
     app.connect("build-finished", _canonicalize_root_in_sitemap, priority=900)

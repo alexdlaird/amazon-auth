@@ -33,7 +33,16 @@ class AmazonAuthRedirectError(AmazonAuthSignInError):
     pass
 
 
-class AmazonAuthWafSolverError(AmazonAuthError):
+class AmazonAuthChallengeUnsolvedError(AmazonAuthError):
+    """
+    Raised when a sign-in challenge form can't handle the challenge it was given (e.g. a solver without its API key,
+    or one that opens a browser window without a display), so the next form registered for the challenge is tried.
+    If none can, the error is raised.
+    """
+    pass
+
+
+class AmazonAuthWafSolverError(AmazonAuthChallengeUnsolvedError):
     """
     Raised when a third-party WAF solver fails (e.g. its balance ran out, its API key was rejected, or the service
     is down), rather than Amazon rejecting a solved challenge. ``meta["provider"]`` is the solver's name, and

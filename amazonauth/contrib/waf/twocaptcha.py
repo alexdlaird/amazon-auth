@@ -10,10 +10,9 @@ from amazonauth.exception import AmazonAuthError, AmazonAuthWafSolverError
 
 class TwoCaptchaWafForm(AwsWafForm):
     """
-    Solves AWS WAF JavaScript challenges via `2Captcha <https://2captcha.com>`_'s
-    ``amazon_waf`` solver method.
+    Passes AWS WAF JavaScript challenges to `2Captcha <https://2captcha.com>`_.
 
-    Reads the API key from the ``TWOCAPTCHA_API_KEY`` environment variable.
+    Its API key is ``TWOCAPTCHA_API_KEY`` (see :attr:`~amazonauth.contrib.waf.base.AwsWafForm.api_key`).
     Requires the ``2captcha-python`` Python package:
     ``pip install amazon-auth[2captcha]``.
     """
@@ -26,9 +25,7 @@ class TwoCaptchaWafForm(AwsWafForm):
                     goku: Dict[str, Any],
                     challenge_script: str) -> str:
         """
-        Solve the AWS WAF challenge via 2Captcha's ``amazon_waf`` method and
-        return the ``aws-waf-token`` cookie value (extracted from the
-        ``existing_token`` field in 2Captcha's response).
+        Solve the AWS WAF challenge with 2Captcha and return the ``aws-waf-token`` cookie value.
 
         :param url: The URL of the WAF-challenged page.
         :param goku: The parsed ``window.gokuProps`` payload.
