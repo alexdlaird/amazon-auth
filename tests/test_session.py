@@ -14,9 +14,11 @@ from responses.matchers import query_string_matcher, urlencoded_params_matcher
 
 from amazonauth.conf import AmazonAuthConfig
 from amazonauth.constants import AuthConstants
-from amazonauth.exception import AmazonAuthSignInError, AmazonAuthRedirectError, AmazonAuthError
-from amazonauth.forms import JSAuthBlocker, MfaDeviceSelectForm
+from amazonauth.exception import (AmazonAuthSignInError, AmazonAuthRedirectError, AmazonAuthError,
+                                  AmazonAuthWafSolverError)
+from amazonauth.forms import AcicAuthBlocker, AuthForm, JSAuthBlocker, MfaDeviceSelectForm
 from amazonauth.session import AmazonSession, IODefault
+from amazonauth.util import AmazonSessionResponse
 from tests._auth_form_stubs import OtherStubAuthForm, StubAuthForm
 from tests.unittestcase import UnitTestCase
 
@@ -1594,6 +1596,66 @@ class TestSession(UnitTestCase):
         self.assertNotIsInstance(cm.exception, AmazonAuthRedirectError)
         self.assertIn("returned 503", str(cm.exception))
         self.assertEqual(1, history_response.call_count)
+
+
+class TestChallengeFormOrder(UnitTestCase):
+    def setUp(self):
+        super().setUp()
+
+        with open(os.path.join(self.RESOURCES_DIR, "auth", "waf-challenge.html"), "r", encoding="utf-8") as f:
+            response = MagicMock()
+            response.text = f.read()
+        self.challenge_page = AmazonSessionResponse(response, self.test_config.bs4_parser)
+
+    def given_challenge_form(self, submit_result=None, error=None):
+        form = MagicMock(spec=AuthForm)
+        form.select_form.return_value = True
+        form.submit.return_value = submit_result
+        form.submit.side_effect = error
+        return form
+
+    def given_session(self, *forms):
+        blockers = [AcicAuthBlocker(self.test_config),
+                    JSAuthBlocker(self.test_config, self.test_config.constants.JS_ROBOT_TEXT_REGEX)]
+        return AmazonSession(config=self.test_config, auth_forms=[*forms, *blockers])
+
+    def test_first_form_that_handles_a_challenge_is_used(self):
+        # GIVEN
+        first = self.given_challenge_form(submit_result="first")
+        second = self.given_challenge_form(submit_result="second")
+        amazon_session = self.given_session(first, second)
+
+        # WHEN
+        result = amazon_session._process_forms(self.challenge_page)
+
+        # THEN
+        self.assertEqual("first", result)
+        second.submit.assert_not_called()
+
+    def test_unsolved_challenge_falls_back_to_the_next_form(self):
+        # GIVEN
+        unsolved = self.given_challenge_form(error=AmazonAuthWafSolverError("TestSolver is out of credit"))
+        fallback = self.given_challenge_form(submit_result="fallback")
+        amazon_session = self.given_session(unsolved, fallback)
+
+        # WHEN
+        result = amazon_session._process_forms(self.challenge_page)
+
+        # THEN
+        self.assertEqual("fallback", result)
+        unsolved.submit.assert_called_once()
+
+    def test_unsolved_challenge_raises_its_own_error_when_no_form_solves_it(self):
+        # GIVEN
+        error = AmazonAuthWafSolverError("TestSolver is out of credit", meta={"provider": "TestSolver"})
+        amazon_session = self.given_session(self.given_challenge_form(error=error))
+
+        # WHEN
+        with self.assertRaises(AmazonAuthWafSolverError) as cm:
+            amazon_session._process_forms(self.challenge_page)
+
+        # THEN
+        self.assertIs(error, cm.exception)
 
 
 class RecordingIO(IODefault):

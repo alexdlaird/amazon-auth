@@ -9,10 +9,9 @@ from amazonauth.exception import AmazonAuthError, AmazonAuthWafSolverError
 
 class AntiCaptchaWafForm(AwsWafForm):
     """
-    Solves AWS WAF JavaScript challenges via `Anti-Captcha
-    <https://anti-captcha.com>`_'s ``AmazonTaskProxyless`` task.
+    Passes AWS WAF JavaScript challenges to `Anti-Captcha <https://anti-captcha.com>`_.
 
-    Reads the API key from the ``ANTICAPTCHA_API_KEY`` environment variable.
+    Its API key is ``ANTICAPTCHA_API_KEY`` (see :attr:`~amazonauth.contrib.waf.base.AwsWafForm.api_key`).
     Requires the ``anticaptchaofficial`` Python package:
     ``pip install amazon-auth[anticaptcha]``.
     """
@@ -25,8 +24,7 @@ class AntiCaptchaWafForm(AwsWafForm):
                     goku: Dict[str, Any],
                     challenge_script: str) -> str:
         """
-        Solve the AWS WAF challenge via Anti-Captcha's ``AmazonTaskProxyless``
-        task type and return the ``aws-waf-token`` cookie value.
+        Solve the AWS WAF challenge with Anti-Captcha and return the ``aws-waf-token`` cookie value.
 
         :param url: The URL of the WAF-challenged page.
         :param goku: The parsed ``window.gokuProps`` payload.

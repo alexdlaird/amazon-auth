@@ -181,7 +181,7 @@ class TestConstants(UnitTestCase):
 
                 # THEN
                 self.assertIn(f"The domain \"{domain}\" isn't an Amazon site.", str(cm.exception))
-                self.assertIn("amazon.co.uk", str(cm.exception))
+                self.assertIn(f"{AmazonAuthConfig.DOCS_URL}/#sites", str(cm.exception))
 
     def test_domain_forms_of_an_amazon_site_are_accepted(self):
         for domain, base_url in [("amazon.de", "https://www.amazon.de"), ("www.amazon.de", "https://www.amazon.de"),
@@ -266,6 +266,17 @@ class TestConstants(UnitTestCase):
         self.assertEqual("https://www.amazon.co.uk/?ref_=nav_custrec_signin",
                          config.constants.SIGN_IN_QUERY_PARAMS["openid.return_to"])
 
+    def test_domain_applied_by_downstream_constants(self):
+        # WHEN
+        config = AmazonAuthConfig(data={
+            "constants_class": "tests.test_constants.DownstreamConstants",
+            "domain": "amazon.co.uk",
+        })
+
+        # THEN
+        self.assertEqual("https://www.amazon.co.uk/subscriptions", config.constants.SUBSCRIPTIONS_URL)
+        self.assertEqual("https://www.amazon.co.uk", config.constants.BASE_URL)
+
 
 class RegionOverrideConstants(AuthConstants):
     SIGN_IN_QUERY_PARAMS = dict(AuthConstants.SIGN_IN_QUERY_PARAMS, **{"openid.assoc_handle": "customflex"})
@@ -274,3 +285,11 @@ class RegionOverrideConstants(AuthConstants):
 
 class RequestCookiesOverrideConstants(AuthConstants):
     REQUEST_COOKIES = {"lc-acbfr": "fr_FR"}
+
+
+class DownstreamConstants(AuthConstants):
+    SUBSCRIPTIONS_URL = f"{AuthConstants.BASE_URL}/subscriptions"
+
+    def apply_domain(self, domain):
+        super().apply_domain(domain)
+        self.SUBSCRIPTIONS_URL = f"{self.BASE_URL}/subscriptions"

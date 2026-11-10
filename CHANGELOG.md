@@ -6,6 +6,14 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased](https://github.com/alexdlaird/amazon-auth/compare/0.2.4...HEAD)
 
+### Deprecated
+
+- `AuthConstants._apply_domain()`, renamed to `apply_domain()`.
+
+### Fixed
+
+- Bug fixes and stability improvements.
+
 ## [0.2.4](https://github.com/alexdlaird/amazon-auth/compare/0.2.3...0.2.4) - 2026-11-10
 
 ### Fixed

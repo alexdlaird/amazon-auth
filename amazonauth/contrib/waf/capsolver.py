@@ -9,10 +9,9 @@ from amazonauth.exception import AmazonAuthError, AmazonAuthWafSolverError
 
 class CapSolverWafForm(AwsWafForm):
     """
-    Solves AWS WAF JavaScript challenges via `CapSolver
-    <https://capsolver.com>`_'s ``AntiAwsWafTaskProxyLess`` task.
+    Passes AWS WAF JavaScript challenges to `CapSolver <https://capsolver.com>`_.
 
-    Reads the API key from the ``CAPSOLVER_API_KEY`` environment variable.
+    Its API key is ``CAPSOLVER_API_KEY`` (see :attr:`~amazonauth.contrib.waf.base.AwsWafForm.api_key`).
     Requires the ``capsolver`` Python package: ``pip install amazon-auth[capsolver]``.
     """
 
@@ -24,8 +23,7 @@ class CapSolverWafForm(AwsWafForm):
                     goku: Dict[str, Any],
                     challenge_script: str) -> str:
         """
-        Solve the AWS WAF challenge via CapSolver's ``AntiAwsWafTaskProxyLess``
-        task type and return the ``aws-waf-token`` cookie value.
+        Solve the AWS WAF challenge with CapSolver and return the ``aws-waf-token`` cookie value.
 
         :param url: The URL of the WAF-challenged page.
         :param goku: The parsed ``window.gokuProps`` payload.
@@ -73,11 +71,10 @@ class CapSolverWafForm(AwsWafForm):
                              image_data: List[str],
                              question: str) -> Optional[List[int]]:
         """
-        Solve a visual grid Puzzle via CapSolver's ``AwsWafClassification`` task
-        type and return the indices of the correct grid cells.
+        Solve a visual grid Puzzle with CapSolver and return the indices of the correct grid cells.
 
         :param url: The URL of the page containing the Puzzle.
-        :param image_data: List of base64-encoded data URLs, one per grid tile.
+        :param image_data: The Puzzle's grid tiles, as base64-encoded images.
         :param question: The object to identify (e.g. ``"the buckets"``).
         :return: A list of zero-based grid cell indices to select.
         :raises AmazonAuthError: if the ``capsolver`` package is not installed.

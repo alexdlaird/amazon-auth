@@ -18,6 +18,7 @@ ROOT_DIR = os.path.normpath(
 sys.path.insert(0, ROOT_DIR)
 
 from amazonauth.conf import AmazonAuthConfig  # noqa: E402
+from amazonauth.region_data import REGION_SITES  # noqa: E402
 
 REGION_DATA_PATH = os.path.join(ROOT_DIR, "amazonauth", "region_data.py")
 REPORT_PATH = os.path.join(ROOT_DIR, "build", "region-data-report.md")
@@ -92,7 +93,12 @@ class SiteWithoutSignInError(SiteUnreadableError):
 
 
 def _request_headers(url):
-    base_headers = AmazonAuthConfig(data={"domain": url.split("/")[2]}).constants.BASE_HEADERS
+    domain = url.split("/")[2]
+    if domain.removeprefix("www.amazon.") in REGION_SITES:
+        base_headers = AmazonAuthConfig(data={"domain": domain}).constants.BASE_HEADERS
+    else:
+        base_headers = {name: value for name, value in AmazonAuthConfig().constants.BASE_HEADERS.items()
+                        if name not in ("Origin", "Referer")}
     return {**base_headers, "Accept-Language": ENGLISH_ACCEPT_LANGUAGE}
 
 

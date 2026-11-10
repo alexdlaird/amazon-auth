@@ -40,15 +40,15 @@ Amazon may present JavaScript-based challenges during login that ``amazon-auth``
 HTTP requests alone. Several opt-in extras address these:
 
 - **AWS WAF JavaScript challenge** — a ``[capsolver]``, ``[anticaptcha]``, or ``[2captcha]`` extra
-  solves this automatically via a third-party API. See :doc:`waf` for setup.
+  passes this to a third-party solver service. See :doc:`waf` for setup.
 - **AWS WAF JavaScript challenge (manual)** — the ``[browser]`` extra opens a visible browser
   window for you to solve the challenge yourself. Suitable when a display is available and you
   are able to handle the challenge interactively. See :ref:`manual-waf-solving` in :doc:`browser` for setup.
 - **ACIC challenge** (``/ax/aaut/verify/ap/challenge``) or **JS bot-detection page**, including Akamai Bot
   Manager's interstitial (a blank page that verifies the browser and then reloads) — the
   ``[browser]`` extra handles these by running a headless browser. When the
-  ACIC page also embeds a WAF challenge, a configured WAF solver extra solves it automatically as
-  part of the same flow. See :doc:`browser` for setup.
+  ACIC page also embeds a challenge, it's passed to a configured WAF solver extra as part of the same flow.
+  See :doc:`browser` for setup.
 - **Legacy text-based Captcha** — the ``[captcha]`` extra auto-solves via
   `amazoncaptcha <https://pypi.org/project/amazoncaptcha/>`_ (Python <=3.12 only;
   incompatible with Python 3.13+). Falls back to manual entry without this extra.
@@ -94,8 +94,10 @@ and inspect.
 
 Have a look at the HTML source of the new page, specifically the ``<form>`` tag, and look in ``forms.py`` to see how
 other auth forms are implemented. You'll need to create a new class that inherits from
-:class:`~amazonauth.forms.AuthForm`, override :func:`~amazonauth.forms.AuthForm.fill_form`, and manually pass
-a list to :func:`~amazonauth.session.AmazonSession.auth_forms` that includes the new form.
+:class:`~amazonauth.forms.AuthForm` and override :func:`~amazonauth.forms.AuthForm.fill_form`. Then add it to
+``auth_forms_classes`` in the :class:`config <amazonauth.conf.AmazonAuthConfig>`, which builds it with only the
+config, or pass :func:`~amazonauth.session.AmazonSession.default_auth_forms` with the new form added as
+``auth_forms`` to :class:`~amazonauth.session.AmazonSession`.
 
 Once you've implemented and tested the new form, `submit a PR <https://github.com/alexdlaird/amazon-auth/compare>`_
 for maximum karma!

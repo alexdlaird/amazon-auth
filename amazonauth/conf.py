@@ -48,6 +48,9 @@ class AmazonAuthConfig:
     other source, then values passed in code, then the config file, then the defaults. The
     value of a key with a default is read as YAML, as it would be in the config file, and any other value is used
     as-is. Environment variables are never persisted to the config file.
+
+    Its default values can be found
+    `here <https://amazon-auth.readthedocs.io/_modules/amazonauth/conf.html#AmazonAuthConfig>`_.
     """
 
     #: The package named in messages that suggest installing something, e.g. ``pip install amazon-auth[lxml]``.

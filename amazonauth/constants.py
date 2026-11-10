@@ -2,6 +2,7 @@ __copyright__ = "Copyright (c) 2024-2025 Alex Laird"
 __license__ = "MIT"
 
 import logging
+import warnings
 from typing import Dict, Optional
 from urllib.parse import urlencode, urlparse
 
@@ -120,6 +121,7 @@ class AuthConstants:
 
     def __init__(self,
                  config: Optional[AmazonAuthConfig] = None) -> None:
+        self._docs_url = config.DOCS_URL if config is not None else AmazonAuthConfig.DOCS_URL
         if config is not None:
             domain, browser = config.domain, config.browser
         else:
@@ -128,7 +130,10 @@ class AuthConstants:
         if browser:
             self._apply_browser(browser)
         if domain:
-            self._apply_domain(domain)
+            if type(self)._apply_domain is not AuthConstants._apply_domain:
+                self._apply_domain(domain)
+            else:
+                self.apply_domain(domain)
         self._apply_language_cookie(self._tld(self.BASE_URL))
 
     @classmethod
@@ -168,13 +173,13 @@ class AuthConstants:
                 headers[key] = value
         self.BASE_HEADERS = headers
 
-    def _apply_domain(self,
-                      domain: str) -> None:
+    def apply_domain(self,
+                     domain: str) -> None:
         """
         Override the URL-derived attributes for the given Amazon domain, and the values that depend on which Amazon
-        site it is, from its region data: the sign-in ``openid.assoc_handle`` (Amazon rejects a sign-in, with HTTP 404,
-        whose handle doesn't match the site), ``Accept-Language``, and
-        ``COOKIES_SET_WHEN_AUTHENTICATED``. Each is applied only when a subclass hasn't overridden it.
+        site it is, from its region data: the sign-in ``openid.assoc_handle``, ``Accept-Language``, and
+        ``COOKIES_SET_WHEN_AUTHENTICATED``. Each is applied only when a subclass hasn't overridden it. A subclass with
+        URLs of its own that depend on the site sets them here, after calling ``super().apply_domain(domain)``.
 
         :param domain: The Amazon domain (e.g. ``amazon.com.au``) or full URL (e.g. ``https://www.amazon.com.au``).
         :raises AmazonAuthError: If the domain isn't an Amazon site in the region data, over ``https``.
@@ -212,6 +217,15 @@ class AuthConstants:
         if auth_cookie and type(self).COOKIES_SET_WHEN_AUTHENTICATED == AuthConstants.COOKIES_SET_WHEN_AUTHENTICATED:
             self.COOKIES_SET_WHEN_AUTHENTICATED = [auth_cookie]
 
+    def _apply_domain(self,
+                      domain: str) -> None:
+        """
+        Deprecated, use :func:`apply_domain` instead. To be removed in 1.0.
+        """
+        warnings.warn("_apply_domain() is deprecated and will be removed in 1.0. Override apply_domain() instead.",
+                      DeprecationWarning, stacklevel=2)
+        self.apply_domain(domain)
+
     def _apply_language_cookie(self,
                                tld: str) -> None:
         """
@@ -245,8 +259,7 @@ class AuthConstants:
             host = host[len("www."):]
         return host[len("amazon."):] if host.startswith("amazon.") else ""
 
-    @classmethod
-    def _normalize_base_url(cls,
+    def _normalize_base_url(self,
                             domain: str) -> str:
         """
         The base URL for an Amazon domain or full URL. Only Amazon's own sites, in the region data and over ``https``,
@@ -267,11 +280,10 @@ class AuthConstants:
 
         parsed = urlparse(base_url)
         host = (parsed.hostname or "").removeprefix("www.")
-        if (parsed.scheme == "https" and host.startswith("amazon.") and cls._tld(base_url) in REGION_SITES and
+        if (parsed.scheme == "https" and host.startswith("amazon.") and self._tld(base_url) in REGION_SITES and
                 not (parsed.port or parsed.username or parsed.password or parsed.path or parsed.params or
                      parsed.query or parsed.fragment)):
             return base_url
 
-        supported_sites = ", ".join(f"amazon.{tld}" for tld in sorted(REGION_SITES))
-        raise AmazonAuthError(f"The domain \"{domain}\" isn't an Amazon site. Use one of {supported_sites}, as "
-                              f"amazon.<site> or https://www.amazon.<site>.")
+        raise AmazonAuthError(f"The domain \"{domain}\" isn't an Amazon site. Use one of the sites at "
+                              f"{self._docs_url}/#sites, as amazon.<site> or https://www.amazon.<site>.")

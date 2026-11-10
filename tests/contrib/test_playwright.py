@@ -20,6 +20,7 @@ from amazonauth.contrib.browser.playwright import (
 from amazonauth.contrib.waf.base import AwsWafForm
 from amazonauth.exception import (
     AmazonAuthBrowserNotInstalledError,
+    AmazonAuthChallengeUnsolvedError,
     AmazonAuthError,
     AmazonAuthSignInError,
     AmazonAuthWafSolverError,
@@ -340,6 +341,9 @@ class TestPlaywrightAcicForm(UnitTestCase):
     def setUp(self):
         super().setUp()
         self.amazon_session = AmazonSession("user", "pass", config=self.test_config)
+        display = patch("amazonauth.contrib.browser.playwright.has_display", return_value=True)
+        display.start()
+        self.addCleanup(display.stop)
 
         with open(os.path.join(self.RESOURCES_DIR, "auth", "acic-challenge.html"),
                   "r", encoding="utf-8") as f:
@@ -465,30 +469,92 @@ class TestPlaywrightAcicForm(UnitTestCase):
         self.assertTrue(any("solve the challenge" in msg for msg in echoed))
         self.assertEqual("refetched", result)
 
-    def test_automated_solver_takes_precedence_over_manual(self):
-        # GIVEN
-        form = PlaywrightAcicForm(self.test_config)
-        self.amazon_session.auth_forms.append(PlaywrightManualWafForm(self.test_config))
+    def given_challenge(self, form):
+        parsed = BeautifulSoup(self.acic_html, self.test_config.bs4_parser)
+        form.select_form(self.amazon_session, parsed)
+        self.amazon_session.get = MagicMock(return_value="refetched")
+        self.amazon_session.io = MagicMock()
+
+        mock_sync_playwright, mock_page, _, _ = _make_mock_playwright()
+        mock_page.url = "https://www.amazon.com/ax/aaut/verify/ap/challenge?aamationToken=test"
+        mock_page.evaluate.side_effect = [{"key": "k", "iv": "i", "context": "c"},
+                                          "https://challenge.awswaf.com/challenge.js"]
+        last_response = MagicMock()
+        last_response.url = "https://www.amazon.com/ax/aaut/verify/ap/challenge?aamationToken=test"
+
+        return (mock_sync_playwright, _playwright_module(mock_sync_playwright, timeout_error_cls=_FakeTimeoutError),
+                last_response)
+
+    def given_waf_solver(self, error=None):
         mock_waf = MagicMock(spec=AwsWafForm)
         mock_waf.PROVIDER_NAME = "TestSolver"
         mock_waf.solve_token.return_value = "waf-token-value"
-        self.amazon_session.auth_forms.append(mock_waf)
-        parsed = BeautifulSoup(self.acic_html, self.test_config.bs4_parser)
-        form.select_form(self.amazon_session, parsed)
+        mock_waf.solve_token.side_effect = error
+        return mock_waf
 
-        last_response = MagicMock()
-        last_response.url = "https://www.amazon.com/ax/aaut/verify/ap/challenge?aamationToken=test"
-        self.amazon_session.get = MagicMock(return_value="refetched")
+    def test_manual_solver_listed_first_is_used_first(self):
+        # GIVEN
+        form = PlaywrightAcicForm(self.test_config)
+        mock_waf = self.given_waf_solver()
+        self.amazon_session.auth_forms += [PlaywrightManualWafForm(self.test_config), mock_waf]
+        mock_sync_playwright, fake_module, last_response = self.given_challenge(form)
 
-        goku = {"key": "k", "iv": "i", "context": "c"}
-        mock_sync_playwright, mock_page, _, _ = _make_mock_playwright()
-        mock_page.url = "https://www.amazon.com/ax/aaut/verify/ap/challenge?aamationToken=test"
-        mock_page.evaluate.side_effect = [goku, "https://challenge.awswaf.com/challenge.js"]
-        fake_module = _playwright_module(mock_sync_playwright, timeout_error_cls=_FakeTimeoutError)
+        # WHEN
+        with patch.dict(sys.modules, {"playwright": MagicMock(), "playwright.sync_api": fake_module}):
+            result = form.submit(last_response)
+
+        # THEN
+        launch_kwargs = mock_sync_playwright.return_value.__enter__.return_value.chromium.launch.call_args
+        self.assertEqual(False, launch_kwargs.kwargs.get("headless"))
+        mock_waf.solve_token.assert_not_called()
+        self.assertEqual("refetched", result)
+
+    def test_automated_solver_listed_first_is_used_first(self):
+        # GIVEN
+        form = PlaywrightAcicForm(self.test_config)
+        mock_waf = self.given_waf_solver()
+        self.amazon_session.auth_forms += [mock_waf, PlaywrightManualWafForm(self.test_config)]
+        mock_sync_playwright, fake_module, last_response = self.given_challenge(form)
 
         # WHEN
         with patch.dict(sys.modules, {"playwright": MagicMock(), "playwright.sync_api": fake_module}):
             form.submit(last_response)
+
+        # THEN
+        launch_kwargs = mock_sync_playwright.return_value.__enter__.return_value.chromium.launch.call_args
+        self.assertEqual(True, launch_kwargs.kwargs.get("headless"))
+        mock_waf.solve_token.assert_called_once()
+
+    def test_failed_solver_falls_back_to_the_next_one(self):
+        # GIVEN
+        form = PlaywrightAcicForm(self.test_config)
+        mock_waf = self.given_waf_solver(error=AmazonAuthWafSolverError(
+            "TestSolver failed to solve AWS WAF challenge: ERROR_ZERO_BALANCE",
+            meta={"provider": "TestSolver", "provider_error": "ERROR_ZERO_BALANCE"}))
+        self.amazon_session.auth_forms += [mock_waf, PlaywrightManualWafForm(self.test_config)]
+        mock_sync_playwright, fake_module, last_response = self.given_challenge(form)
+
+        # WHEN
+        with patch.dict(sys.modules, {"playwright": MagicMock(), "playwright.sync_api": fake_module}):
+            result = form.submit(last_response)
+
+        # THEN
+        launches = mock_sync_playwright.return_value.__enter__.return_value.chromium.launch.call_args_list
+        self.assertEqual([True, False], [launch.kwargs.get("headless") for launch in launches])
+        mock_waf.solve_token.assert_called_once()
+        self.assertEqual("refetched", result)
+
+    def test_manual_solver_without_a_display_is_skipped(self):
+        # GIVEN
+        form = PlaywrightAcicForm(self.test_config)
+        mock_waf = self.given_waf_solver()
+        self.amazon_session.auth_forms += [PlaywrightManualWafForm(self.test_config), mock_waf]
+        mock_sync_playwright, fake_module, last_response = self.given_challenge(form)
+
+        # WHEN
+        with patch("amazonauth.contrib.browser.playwright.has_display", return_value=False):
+            with patch.dict(sys.modules, {"playwright": MagicMock(), "playwright.sync_api": fake_module}):
+                form.submit(last_response)
 
         # THEN
         launch_kwargs = mock_sync_playwright.return_value.__enter__.return_value.chromium.launch.call_args
@@ -1095,6 +1161,9 @@ class TestPlaywrightManualWafForm(UnitTestCase):
     def setUp(self):
         super().setUp()
         self.amazon_session = AmazonSession("user", "pass", config=self.test_config)
+        display = patch("amazonauth.contrib.browser.playwright.has_display", return_value=True)
+        display.start()
+        self.addCleanup(display.stop)
 
         with open(os.path.join(self.RESOURCES_DIR, "auth", "waf-challenge.html"),
                   "r", encoding="utf-8") as f:
@@ -1166,6 +1235,23 @@ class TestPlaywrightManualWafForm(UnitTestCase):
         # THEN
         launch_kwargs = mock_sync_playwright.return_value.__enter__.return_value.chromium.launch.call_args
         self.assertEqual(False, launch_kwargs.kwargs.get("headless"))
+
+    def test_submit_without_a_display_raises(self):
+        # GIVEN
+        form = PlaywrightManualWafForm(self.test_config)
+        parsed = BeautifulSoup(self.waf_html, self.test_config.bs4_parser)
+        form.select_form(self.amazon_session, parsed)
+
+        last_response = MagicMock()
+        last_response.url = "https://www.amazon.com/errors/validateCaptcha"
+
+        # WHEN
+        with patch("amazonauth.contrib.browser.playwright.has_display", return_value=False):
+            with self.assertRaises(AmazonAuthChallengeUnsolvedError) as cm:
+                form.submit(last_response)
+
+        # THEN
+        self.assertIn("requires a display", str(cm.exception))
 
     def test_on_challenge_page_echoes_user_message(self):
         # GIVEN
