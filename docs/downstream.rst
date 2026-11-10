@@ -2,9 +2,9 @@
 Building on ``amazon-auth``
 ===========================
 
-``amazon-auth`` is built to be built on. A package that reads more of Amazon's website, like
-|amazon-orders|_, gets sign-in, the session, challenges, and the config file
-from ``amazon-auth``, and extends each by subclassing it. Every class below is meant to be subclassed this way.
+``amazon-auth`` is meant to be built on: a package that reads more of Amazon's website, like |amazon-orders|_, gets
+sign-in, the session, challenges, and the config file from ``amazon-auth``, and extends each by subclassing it. Every
+class below is meant to be subclassed this way.
 
 Config
 ------
