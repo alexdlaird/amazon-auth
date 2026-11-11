@@ -49,36 +49,23 @@ HTTP requests alone. Several opt-in extras address these:
   ``[browser]`` extra handles these by running a headless browser. When the
   ACIC page also embeds a challenge, it's passed to a configured WAF solver extra as part of the same flow.
   See :doc:`browser` for setup.
-- **Legacy text-based Captcha** — the ``[captcha]`` extra auto-solves via
-  `amazoncaptcha <https://pypi.org/project/amazoncaptcha/>`_ (Python <=3.12 only;
-  incompatible with Python 3.13+). Falls back to manual entry without this extra.
 
 If a supported extra isn't working for you, please
 `open an issue <https://github.com/alexdlaird/amazon-auth/issues/new?assignees=&labels=bug&projects=&template=bug-report.yml>`_
 or a `pull request <https://github.com/alexdlaird/amazon-auth/compare>`_.
 
-To attempt to fully automate login, you need to minimize how often (if at all) you are presented with Captcha
-challenges. There is no perfect workaround to this, as when and how challenges are presented is at the discretion of
-Amazon, but there are at least a few ways you can try to reduce the likelihood you will be presented with
-Captcha challenges:
+To attempt to fully automate login, you need to minimize how often (if at all) you are presented with challenges.
+There is no perfect workaround to this, as when and how challenges are presented is at the discretion of Amazon, but
+there are at least a few ways you can try to reduce the likelihood you will be presented with them:
 
 - Ensure credentials are correct. Too many failed login attempts in a short period of time increases the chances of
-  being given a Captcha challenge. Persisting authentication in the config or the environment (see :attr:`~amazonauth.session.AmazonSession.username`)
+  being given a challenge. Persisting authentication in the config or the environment (see :attr:`~amazonauth.session.AmazonSession.username`)
   can help ensure passwords are never entered incorrectly.
 - Wait several hours (sometimes over a day is necessary) before trying again.
 - Enable 2FA. One-time password (OTP) challenges during login can be auto-solved with :attr:`~amazonauth.session.AmazonSession.otp_secret_key`,
-  and having this security measure enabled seems to reduce the frequency of Captcha challenges.
-- Use a browser to manually solve the Captcha, as doing so may reduce the likelihood Amazon will continue to give you
-  Captcha challenges from ``amazon-auth``.
-
-    - In your browser, visit https://www.amazon.com/errors/validateCaptcha to solve a Captcha challenge while logged
-      in to your account.
-
-    - Logout of your account, then log back in. Amazon may present you with a different Captcha flow in this case,
-      which may be the one that needs to be solved for them to stop prompting you.
-
-    - Captcha challenges are more often presented to unknown devices. If possible, first manually login from a browser on
-      the device on which you're using ``amazon-auth``.
+  and having this security measure enabled seems to reduce the frequency of challenges.
+- Challenges are more often presented to unknown devices. If possible, first manually login from a browser on the
+  device on which you're using ``amazon-auth``.
 
 Found an Unknown Page in the Sign-In Flow
 -----------------------------------------

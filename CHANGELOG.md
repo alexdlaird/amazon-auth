@@ -6,6 +6,14 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased](https://github.com/alexdlaird/amazon-auth/compare/1.0.0...HEAD)
 
+### Added
+
+- Support for Python 3.14 and 3.15.
+
+### Removed
+
+- The `captcha` extra, which auto-solved the legacy image Captcha. A Captcha is still shown for its characters to be entered. To keep auto-solve, pin `amazon-auth[captcha]<1.1`, i.e. 1.0.
+
 ## [1.0.0](https://github.com/alexdlaird/amazon-auth/compare/0.3.0...1.0.0) - 2026-11-11
 
 - First stable release of `amazon-auth`.

@@ -10,9 +10,8 @@ resulting session back into ``amazon-auth``.
 .. note::
 
     The ``[browser]`` extra also lets you sign in on Amazon's own page, see :ref:`Secure Sign-In <secure-sign-in>`.
-    This page covers handling JavaScript sign-in challenges, not image Captchas. For legacy OCR-based
-    image Captchas, see the ``[captcha]`` extra in :doc:`troubleshooting`. For the standalone AWS WAF JavaScript
-    challenge (which can appear independently of an ACIC page), see :doc:`waf`.
+    This page covers handling JavaScript sign-in challenges. For the standalone AWS WAF JavaScript challenge (which
+    can appear independently of an ACIC page), see :doc:`waf`.
 
 Three challenge types are covered:
 

@@ -157,14 +157,6 @@ a headless browser, install with the ``browser`` extra:
 
 See :doc:`browser` for details.
 
-For **legacy Captcha auto-solve** on Python <=3.12, install with ``captcha`` extra:
-
-.. code:: sh
-
-    pip install amazon-auth[captcha]
-
-See :ref:`Login Challenges <login-challenges>` for details.
-
 Sites
 -----
 
