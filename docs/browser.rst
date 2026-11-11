@@ -120,6 +120,20 @@ window is needed.
         def wait_for_sign_in(self, context, page, timeout):
             ...
 
+Override ``launch_env()`` to set variables only for the browser child. The default, ``None``, inherits the process
+environment. A mapping replaces that environment, including an empty mapping; copy ``os.environ`` to retain other
+variables. The Linux display check uses the same mapping. The parent process and Playwright driver keep their own
+environment.
+
+.. code-block:: python
+
+    import os
+
+
+    class DisplayBrowserLogin(PlaywrightBrowserLogin):
+        def launch_env(self):
+            return {**os.environ, "DISPLAY": ":42"}
+
 If a supported extra isn't working for you, please
 `open an issue <https://github.com/alexdlaird/amazon-auth/issues/new?assignees=&labels=bug&projects=&template=bug-report.yml>`_
 or a `pull request <https://github.com/alexdlaird/amazon-auth/compare>`_.
