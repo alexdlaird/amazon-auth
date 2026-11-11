@@ -210,3 +210,5 @@ For more advanced usage, dive deeper in to the rest of the documentation.
    waf
    browser
    troubleshooting
+
+.. include:: ../CONTRIBUTING.rst
