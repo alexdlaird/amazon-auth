@@ -1045,21 +1045,13 @@ class PlaywrightBrowserLogin:
 
     def _amazon_cookies(self,
                         cookies: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        base_domain = (urlparse(self.config.constants.BASE_URL).hostname or "").removeprefix("www.")
-
-        return [cookie for cookie in cookies if self._is_domain_or_subdomain(cookie["domain"], base_domain)]
-
-    @staticmethod
-    def _is_domain_or_subdomain(domain: str,
-                                parent_domain: str) -> bool:
-        return f".{domain.lstrip('.')}".endswith(f".{parent_domain}")
+        return [cookie for cookie in cookies if self.amazon_session._is_site_cookie(cookie)]
 
     def _harvest_cookies(self,
                          context: Any) -> None:
         cookie_jar = self.amazon_session.session.cookies
         cookie_jar.clear()
-        for cookie in self._amazon_cookies(context.cookies()):
-            cookie_jar.set(cookie["name"], cookie["value"], **_jar_cookie_attributes(cookie))
+        self.amazon_session._load_cookie_jar_data(self._amazon_cookies(context.cookies()))
 
     def _verify_session(self) -> None:
         try:

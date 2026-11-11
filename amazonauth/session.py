@@ -361,6 +361,35 @@ class AmazonSession:
 
         return True
 
+    def import_cookies(self,
+                       cookies: List[Dict[str, Any]],
+                       verify: bool = True) -> None:
+        """
+        Replace this session's cookies with the configured site's cookies and persist them using the normal jar
+        format and permissions. Accepts cookies as Playwright's ``BrowserContext.cookies()`` returns them.
+
+        By default, ask Amazon whether it accepts the imported session before saving it. With ``verify=False``,
+        no request is made and ``is_authenticated`` remains ``False``. This replaces the in-memory session even if
+        verification fails; it does not provide isolated verification or a transaction with other jar writers.
+
+        :param cookies: Cookies with name, value and domain, and optional path, secure and expires attributes.
+        :param verify: Whether to verify the imported session with :func:`check_session`.
+        :raises AmazonAuthSignInError: If verification finds no authenticated session or Amazon rejects it.
+        :raises AmazonAuthError: If the verification request fails.
+        """
+        self.is_authenticated = False
+        self._sign_in_required = False
+        self.session.cookies.clear()
+        self._load_cookie_jar_data([cookie for cookie in cookies if self._is_site_cookie(cookie)])
+
+        if verify:
+            if not self.check_session(verify=True):
+                raise AmazonAuthSignInError("Amazon did not accept the imported session. Try signing in again.")
+            self.is_authenticated = True
+
+        with cookies_file_lock:
+            self._write_cookie_jar()
+
     def login(self) -> None:
         """
         Execute an Amazon login process. This will include the sign-in page, and may also include OTP (if 2FA is
@@ -445,9 +474,10 @@ class AmazonSession:
             data = [{"name": name, "value": value, "domain": domain} for name, value in data.items()]
 
         for cookie in data:
+            expires = cookie.get("expires")
             self.session.cookies.set(cookie["name"], cookie["value"], domain=cookie.get("domain", ""),
                                      path=cookie.get("path", "/"), secure=cookie.get("secure", False),
-                                     expires=cookie.get("expires"))
+                                     expires=int(expires) if expires is not None and expires >= 0 else None)
 
     def _load_shared_cookie_jar(self) -> None:
         """
