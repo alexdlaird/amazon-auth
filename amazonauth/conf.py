@@ -6,7 +6,6 @@ import logging
 import os
 import re
 import threading
-import warnings
 from typing import Any, Dict, List, Optional, Set, Union
 from urllib.parse import urlparse
 
@@ -78,7 +77,7 @@ class AmazonAuthConfig:
         #: The path to use for the config file.
         self.config_path: str = os.path.join(DEFAULT_CONFIG_DIR, "config.yml") if config_path is None else config_path
 
-        self._data: Dict[str, Any] = self._defaults()
+        self._data: Dict[str, Any] = self.default_data()
         self._environment: Dict[str, Any] = self.read_environment()
         self._resolved_classes: Dict[str, Any] = {}
         self._assigned_classes: Dict[str, Any] = {}
@@ -113,7 +112,7 @@ class AmazonAuthConfig:
         :return: The config values set in the environment, by config key.
         :raises AmazonAuthError: If the value of a key with a default is not valid YAML.
         """
-        default_data = cls._defaults()
+        default_data = cls.default_data()
         environment = {}
         for name, value in os.environ.items():
             if not name.startswith(ENVIRONMENT_VARIABLE_PREFIX) or not value:
@@ -184,21 +183,6 @@ class AmazonAuthConfig:
         }
 
     @staticmethod
-    def _default_data() -> Dict[str, Any]:
-        """
-        Deprecated, use :func:`default_data` instead. To be removed in 1.0.
-        """
-        warnings.warn("_default_data() is deprecated and will be removed in 1.0. Override default_data() instead.",
-                      DeprecationWarning, stacklevel=2)
-        return AmazonAuthConfig.default_data()
-
-    @classmethod
-    def _defaults(cls) -> Dict[str, Any]:
-        if cls._default_data is not AmazonAuthConfig._default_data:
-            return cls._default_data()
-        return cls.default_data()
-
-    @staticmethod
     def _default_cookie_jar_path() -> str:
         return os.path.join(DEFAULT_CONFIG_DIR, "cookies.json")
 
@@ -225,7 +209,7 @@ class AmazonAuthConfig:
         try:
             return util.load_class(module_path.split("."), class_name)
         except ModuleNotFoundError as e:
-            default_class_path = self._defaults()[key]
+            default_class_path = self.default_data()[key]
             if (class_path == default_class_path or not e.name or
                     not (module_path == e.name or module_path.startswith(f"{e.name}."))):
                 raise

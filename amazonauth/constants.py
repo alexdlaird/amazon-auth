@@ -2,7 +2,6 @@ __copyright__ = "Copyright (c) 2024-2025 Alex Laird"
 __license__ = "MIT"
 
 import logging
-import warnings
 from typing import Dict, Optional
 from urllib.parse import urlencode, urlparse
 
@@ -130,10 +129,7 @@ class AuthConstants:
         if browser:
             self._apply_browser(browser)
         if domain:
-            if type(self)._apply_domain is not AuthConstants._apply_domain:
-                self._apply_domain(domain)
-            else:
-                self.apply_domain(domain)
+            self.apply_domain(domain)
         self._apply_language_cookie(self._tld(self.BASE_URL))
 
     @classmethod
@@ -216,15 +212,6 @@ class AuthConstants:
         auth_cookie = self.region_auth_cookie(tld)
         if auth_cookie and type(self).COOKIES_SET_WHEN_AUTHENTICATED == AuthConstants.COOKIES_SET_WHEN_AUTHENTICATED:
             self.COOKIES_SET_WHEN_AUTHENTICATED = [auth_cookie]
-
-    def _apply_domain(self,
-                      domain: str) -> None:
-        """
-        Deprecated, use :func:`apply_domain` instead. To be removed in 1.0.
-        """
-        warnings.warn("_apply_domain() is deprecated and will be removed in 1.0. Override apply_domain() instead.",
-                      DeprecationWarning, stacklevel=2)
-        self.apply_domain(domain)
 
     def _apply_language_cookie(self,
                                tld: str) -> None:

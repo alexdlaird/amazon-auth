@@ -4,7 +4,15 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased](https://github.com/alexdlaird/amazon-auth/compare/0.3.0...HEAD)
+## [Unreleased](https://github.com/alexdlaird/amazon-auth/compare/1.0.0...HEAD)
+
+## [1.0.0](https://github.com/alexdlaird/amazon-auth/compare/0.3.0...1.0.0) - 2026-11-11
+
+- First stable release of `amazon-auth`.
+
+### Removed
+
+- The deprecated `AmazonAuthConfig._default_data()` and `AuthConstants._apply_domain()`.
 
 ## [0.3.0](https://github.com/alexdlaird/amazon-auth/compare/0.2.6...0.3.0) - 2026-11-11
 
