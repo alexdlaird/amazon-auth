@@ -66,3 +66,12 @@ register its CLI commands. See [Building on `amazon-auth`](https://amazon-auth.r
 
 For more advanced usage, `amazon-auth`'s official documentation is available
 at [Read the Docs](https://amazon-auth.readthedocs.io).
+
+## Contributing
+
+If you would like to get involved, be sure to review
+the [Contribution Guide](https://github.com/alexdlaird/amazon-auth/blob/main/CONTRIBUTING.rst).
+
+Want to contribute financially? If you've found `amazon-auth`
+useful, [sponsorship](https://github.com/sponsors/alexdlaird) would
+also be greatly appreciated!

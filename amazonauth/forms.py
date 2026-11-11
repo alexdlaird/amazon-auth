@@ -13,11 +13,6 @@ from PIL import Image
 from bs4 import Tag
 from requests import Response
 
-try:
-    from amazoncaptcha import AmazonCaptcha
-except ImportError:  # pragma: no cover
-    AmazonCaptcha = None  # type: ignore[assignment, misc]
-
 from amazonauth import util
 from amazonauth.conf import AmazonAuthConfig
 from amazonauth.exception import AmazonAuthSignInError, AmazonAuthError
@@ -31,11 +26,8 @@ class AuthForm(ABC):
     """
     The base class of an authentication ``<form>`` that can be submitted.
 
-    The base implementation will attempt to auto-solve Captcha when the optional
-    ``amazoncaptcha`` dependency is installed (``pip install amazon-auth[captcha]``,
-    available on Python <=3.12 only). If auto-solve is unavailable or fails, it will
-    use the default image view to show the Captcha prompt, and it will also pass the
-    image URL to :func:`~amazonauth.session.IODefault.prompt` as ``img_url``.
+    The base implementation shows a Captcha with the default image view, prompts for its characters, and also
+    passes the image URL to :func:`~amazonauth.session.IODefault.prompt` as ``img_url``.
     """
 
     def __init__(self,
@@ -145,27 +137,12 @@ class AuthForm(ABC):
                 "Call AuthForm.select_form() first."
             )  # pragma: no cover
 
-        if AmazonCaptcha is not None:
-            captcha_response = AmazonCaptcha.fromlink(url).solve()
-        else:
-            captcha_response = None
+        img_response = self.amazon_session.session.get(url)
+        img = Image.open(BytesIO(img_response.content))
+        img.show()
 
-        if not captcha_response or captcha_response.lower() == "not solved":
-            img_response = self.amazon_session.session.get(url)
-            img = Image.open(BytesIO(img_response.content))
-            img.show()
-
-            if AmazonCaptcha is None:
-                self.amazon_session.io.echo(
-                    "Info: Captcha auto-solve is unavailable. Install with "
-                    f"`pip install {self.config.PACKAGE_NAME}[captcha]` to enable it (only compatible with Python "
-                    "<=3.12).")
-            else:
-                self.amazon_session.io.echo("Info: The Captcha couldn't be auto-solved.")
-
-            captcha_response = self.amazon_session.io.prompt("Enter the characters shown in the image",
-                                                             img_url=url)
-            self.amazon_session.io.echo("")
+        captcha_response = self.amazon_session.io.prompt("Enter the characters shown in the image", img_url=url)
+        self.amazon_session.io.echo("")
 
         return captcha_response
 
