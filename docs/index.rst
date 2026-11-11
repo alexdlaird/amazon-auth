@@ -180,6 +180,18 @@ A ``domain`` can be any of these Amazon sites:
 
 .. supported-sites::
 
+Accounts
+--------
+
+To use more than one Amazon account, like a partner's, give each other account a name with ``account`` in the
+:class:`config <amazonauth.conf.AmazonAuthConfig>` (e.g. ``spouse``). Each account keeps its own sessions, in a
+directory named for it in the config directory (e.g. ``accounts/spouse/cookies.json``), so signing in to one leaves
+the others as they are. The sessions kept in the config directory itself are the ``default`` account, which is used
+when no ``account`` is given. To make another account the default, save its name as ``account`` in the config file.
+
+An account's name is letters, digits, ``-`` and ``_``, in any case. An explicit ``cookie_jar_path`` keeps one
+session, so it can only be used with the ``default`` account.
+
 Known Limitations
 -----------------
 

@@ -109,6 +109,36 @@ class TestLaunchBrowser(UnitTestCase):
         self.assertEqual(mock_browser, browser)
         pw.chromium.launch.assert_called_once_with(headless=True, channel="chrome")
 
+    def test_launch_env_reaches_default_fallbacks_and_selected_browser(self):
+        # GIVEN
+        pw, fake_module, _ = self.given_playwright()
+        pw.chromium.launch.side_effect = [_FakePlaywrightError("missing chrome"),
+                                          _FakePlaywrightError("missing edge"), MagicMock(), MagicMock()]
+        env = {"DISPLAY": ":42", "PATH": "/usr/bin"}
+
+        # WHEN
+        with patch.dict(sys.modules, {"playwright": MagicMock(), "playwright.sync_api": fake_module}):
+            PlaywrightBrowserLauncher(AmazonAuthConfig(data={})).launch(pw, headless=False, env=env)
+            PlaywrightBrowserLauncher(AmazonAuthConfig(data={"browser": "chromium"})).launch(
+                pw, headless=True, env=env)
+
+        # THEN
+        self.assertEqual([call(headless=False, env=env, channel="chrome"),
+                          call(headless=False, env=env, channel="msedge"),
+                          call(headless=False, env=env), call(headless=True, env=env)],
+                         pw.chromium.launch.call_args_list)
+
+    def test_launch_with_empty_env(self):
+        # GIVEN
+        pw, fake_module, _ = self.given_playwright()
+
+        # WHEN
+        with patch.dict(sys.modules, {"playwright": MagicMock(), "playwright.sync_api": fake_module}):
+            PlaywrightBrowserLauncher(AmazonAuthConfig(data={})).launch(pw, headless=True, env={})
+
+        # THEN
+        pw.chromium.launch.assert_called_once_with(headless=True, env={}, channel="chrome")
+
     def test_launches_with_args(self):
         # GIVEN
         pw, fake_module, _ = self.given_playwright()
@@ -1399,6 +1429,52 @@ class TestPlaywrightBrowserLogin(UnitTestCase):
                           ("wait_for_sign_in", custom_context, mock_page, 42)], hook_calls)
         amazon_session.io.echo.assert_not_called()
         custom_context.cookies.assert_called_once_with()
+
+    @patch("amazonauth.util.sys.platform", "linux")
+    def test_login_uses_child_display_without_changing_parent(self):
+        # GIVEN
+        mock_sync_playwright, _, _, _ = _make_mock_playwright(
+            pw_cookies=[{"name": "x-main", "value": "session", "domain": ".amazon.com"}])
+        env = {"DISPLAY": ":42"}
+
+        class ChildDisplayLogin(PlaywrightBrowserLogin):
+            def launch_env(self):
+                return env
+
+        browser_login = ChildDisplayLogin(AmazonSession(config=self.test_config))
+
+        # WHEN
+        with patch.dict(os.environ, {}, clear=True), \
+                patch.dict(sys.modules, {"playwright": MagicMock(),
+                                         "playwright.sync_api": _playwright_module(mock_sync_playwright)}), \
+                patch.object(PlaywrightBrowserLogin, "_verify_session"):
+            browser_login.login()
+            self.assertEqual({}, dict(os.environ))
+
+        # THEN
+        pw = mock_sync_playwright.return_value.__enter__.return_value
+        pw.chromium.launch.assert_called_once_with(headless=False, channel="chrome", env=env)
+
+    @patch("amazonauth.util.sys.platform", "linux")
+    def test_empty_child_env_does_not_use_parent_display(self):
+        # GIVEN
+        class EmptyEnvLogin(PlaywrightBrowserLogin):
+            def launch_env(self):
+                return {}
+
+        mock_sync_playwright, _, _, _ = _make_mock_playwright(
+            pw_cookies=[{"name": "x-main", "value": "session", "domain": ".amazon.com"}])
+        browser_login = EmptyEnvLogin(AmazonSession(config=self.test_config))
+
+        # WHEN
+        with patch.dict(os.environ, {"DISPLAY": ":1"}), \
+                patch.dict(sys.modules, {"playwright": MagicMock(),
+                                         "playwright.sync_api": _playwright_module(mock_sync_playwright)}):
+            with self.assertRaises(AmazonAuthError):
+                browser_login.login(timeout=0)
+
+        # THEN
+        mock_sync_playwright.assert_not_called()
 
     @responses.activate
     def test_verify_session_accepts_session(self):

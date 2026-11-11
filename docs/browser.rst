@@ -120,6 +120,31 @@ window is needed.
         def wait_for_sign_in(self, context, page, timeout):
             ...
 
+Override ``launch_env()`` to launch the browser with its own environment, like a different ``DISPLAY``. A mapping
+replaces this process's environment, so copy ``os.environ`` to keep the rest of it.
+
+.. code-block:: python
+
+    import os
+
+
+    class DisplayBrowserLogin(PlaywrightBrowserLogin):
+        def launch_env(self):
+            return {**os.environ, "DISPLAY": ":42"}
+
+Importing Cookies
+-----------------
+
+If sign-in happens in a browser of your own, pass its cookies to
+:meth:`~amazonauth.session.AmazonSession.import_cookies` rather than writing the cookie jar yourself:
+
+.. code-block:: python
+
+    session.import_cookies(context.cookies())
+
+Only the configured site's cookies are kept, and Amazon is asked whether it accepts the session, raising if it
+doesn't. Pass ``verify=False`` to skip that request, leaving the first request you make to find out.
+
 If a supported extra isn't working for you, please
 `open an issue <https://github.com/alexdlaird/amazon-auth/issues/new?assignees=&labels=bug&projects=&template=bug-report.yml>`_
 or a `pull request <https://github.com/alexdlaird/amazon-auth/compare>`_.

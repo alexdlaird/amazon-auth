@@ -99,6 +99,16 @@ class TestUtil(UnitTestCase):
         # THEN
         self.assertIsNone(tag)
 
+    @patch("amazonauth.util.sys.platform", "linux")
+    def test_has_display_supplied_environment(self):
+        # GIVEN
+        with patch.dict(os.environ, {"DISPLAY": ":1"}):
+            # WHEN / THEN
+            self.assertFalse(has_display({}))
+            self.assertTrue(has_display({"DISPLAY": ":42"}))
+            self.assertTrue(has_display({"WAYLAND_DISPLAY": "wayland-2"}))
+            self.assertTrue(has_display())
+
     @patch.object(sys, "platform", "linux")
     def test_has_display_linux_without_display(self):
         # GIVEN
