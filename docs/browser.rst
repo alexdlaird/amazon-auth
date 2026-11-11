@@ -123,3 +123,18 @@ window is needed.
 If a supported extra isn't working for you, please
 `open an issue <https://github.com/alexdlaird/amazon-auth/issues/new?assignees=&labels=bug&projects=&template=bug-report.yml>`_
 or a `pull request <https://github.com/alexdlaird/amazon-auth/compare>`_.
+
+Importing Cookies
+-----------------
+
+If sign-in happens in a browser you manage, pass its cookies to
+:meth:`~amazonauth.session.AmazonSession.import_cookies` rather than writing the cookie jar yourself:
+
+.. code-block:: python
+
+    session.import_cookies(context.cookies())
+
+Only cookies for the configured site are kept. The default verifies the session with Amazon and raises if it is
+rejected. To defer verification to your first actual request, use ``verify=False``; this makes no requests and leaves
+``is_authenticated`` false. Imports replace the in-memory cookies, including on verification failure. Verification
+uses the normal session and does not isolate response cookie updates or provide a transaction with other writers.
