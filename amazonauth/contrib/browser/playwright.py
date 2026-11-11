@@ -74,13 +74,15 @@ class PlaywrightBrowserLauncher:
     def launch(self,
                pw: Any,
                headless: bool,
-               args: Optional[List[str]] = None) -> Any:
+               args: Optional[List[str]] = None,
+               env: Optional[Dict[str, str]] = None) -> Any:
         """
         Launch the browser the config selects.
 
         :param pw: The running Playwright instance.
         :param headless: Whether to launch the browser without a window.
         :param args: Command line arguments to launch the browser with, beside Playwright's own.
+        :param env: The browser child's environment, or ``None`` to inherit the process environment.
         :return: The launched Playwright ``Browser``.
         :raises AmazonAuthBrowserNotInstalledError: If no browser is installed to launch.
         :raises AmazonAuthError: If the browser can't be launched.
@@ -90,9 +92,9 @@ class PlaywrightBrowserLauncher:
         browser_name = self.config.browser
         executable_path = self.config.browser_executable_path
         if not browser_name and not executable_path:
-            return self._launch_default(pw, headless, args)
+            return self._launch_default(pw, headless, args, env)
 
-        launch_options = self._launch_options(headless, args)
+        launch_options = self._launch_options(headless, args, env)
         channel = None
         browser_type = self._browser_types(pw).get(browser_name or self.FALLBACK_BROWSER_TYPE)
         if browser_type is None:
@@ -143,10 +145,11 @@ class PlaywrightBrowserLauncher:
     def _launch_default(self,
                         pw: Any,
                         headless: bool,
-                        args: Optional[List[str]]) -> Any:
+                        args: Optional[List[str]],
+                        env: Optional[Dict[str, str]]) -> Any:
         from playwright.sync_api import Error as PlaywrightError  # type: ignore[import-not-found]
 
-        launch_options = self._launch_options(headless, args)
+        launch_options = self._launch_options(headless, args, env)
         for channel in (self.DEFAULT_BROWSER_CHANNEL, self.FALLBACK_BROWSER_CHANNEL):
             try:
                 return pw.chromium.launch(channel=channel, **launch_options)
@@ -173,10 +176,13 @@ class PlaywrightBrowserLauncher:
 
     @staticmethod
     def _launch_options(headless: bool,
-                        args: Optional[List[str]]) -> Dict[str, Any]:
+                        args: Optional[List[str]],
+                        env: Optional[Dict[str, str]]) -> Dict[str, Any]:
         launch_options: Dict[str, Any] = {"headless": headless}
         if args:
             launch_options["args"] = args
+        if env is not None:
+            launch_options["env"] = env
 
         return launch_options
 
@@ -904,13 +910,14 @@ class PlaywrightBrowserLogin:
                 f"Install it with: `pip install {self.config.PACKAGE_NAME}[browser]`"
             ) from e
 
-        self._require_display()
+        env = self.launch_env()
+        self._require_display(env)
 
         constants = self.config.constants
         sign_in_url = f"{constants.SIGN_IN_URL}?{urlencode(constants.SIGN_IN_QUERY_PARAMS)}"
 
         with sync_playwright() as pw:
-            browser = PlaywrightBrowserLauncher(self.config).launch(pw, self.headless, self.launch_args())
+            browser = PlaywrightBrowserLauncher(self.config).launch(pw, self.headless, self.launch_args(), env=env)
 
             try:
                 context = self.new_context(browser)
@@ -935,6 +942,16 @@ class PlaywrightBrowserLogin:
         none.
 
         :return: The arguments, or ``None`` for none.
+        """
+        return None
+
+    def launch_env(self) -> Optional[Dict[str, str]]:
+        """
+        Hook for the browser child's environment. ``None`` inherits the process environment. A supplied mapping
+        replaces it, so copy ``os.environ`` first if the browser should inherit other variables. The parent process
+        and Playwright driver environment are unchanged.
+
+        :return: The child's environment, or ``None`` to inherit it.
         """
         return None
 
@@ -986,8 +1003,9 @@ class PlaywrightBrowserLogin:
         except Exception as e:
             logger.debug(f"Skipped pre-filling the username in the browser: {e}")
 
-    def _require_display(self) -> None:
-        if not self.headless and not has_display():
+    def _require_display(self,
+                         env: Optional[Dict[str, str]] = None) -> None:
+        if not self.headless and not has_display(env):
             raise AmazonAuthError("Signing in with a browser requires a display, and this machine doesn't have one.")
 
     def wait_for_sign_in(self,
