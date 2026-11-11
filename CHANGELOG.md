@@ -10,6 +10,11 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 - `AmazonSession.import_cookies()`, to use the cookies of a browser signed in to Amazon.
 - `PlaywrightBrowserLogin.launch_env()`, to launch the sign-in browser with its own environment.
+- Multiple Amazon accounts, each with its own sessions, chosen with the `account` config key.
+
+### Fixed
+
+- Bug fixes and stability improvements.
 
 ## [0.2.6](https://github.com/alexdlaird/amazon-auth/compare/0.2.5...0.2.6) - 2026-11-10
 

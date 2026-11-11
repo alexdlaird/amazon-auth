@@ -4,9 +4,10 @@ __license__ = "MIT"
 import inspect
 import logging
 import os
+import re
 import threading
 import warnings
-from typing import Any, Dict, Optional, Set, Union
+from typing import Any, Dict, List, Optional, Set, Union
 from urllib.parse import urlparse
 
 import yaml
@@ -28,6 +29,16 @@ ENVIRONMENT_VARIABLE_PREFIX = "AMAZON_"
 
 #: The Amazon site whose session is kept in the default ``cookie_jar_path`` itself, rather than in a jar of its own.
 DEFAULT_COOKIE_JAR_SITE = "amazon.com"
+
+#: The account whose sessions are kept beside the default ``cookie_jar_path`` itself, rather than in a directory of
+#: its own, and the one used when no ``account`` is given.
+DEFAULT_ACCOUNT = "default"
+
+#: The directory, beside the default ``cookie_jar_path``, where each other account's sessions are kept, in a
+#: directory named for the account.
+ACCOUNTS_DIRECTORY = "accounts"
+
+ACCOUNT_NAME_PATTERN = re.compile(r"^[a-z0-9_-]+$")
 
 
 class AmazonAuthConfig:
@@ -87,6 +98,7 @@ class AmazonAuthConfig:
 
         self._validate_bs4_parser()
         self._validate_class_paths()
+        self._validate_account()
 
         #: The :class:`~amazonauth.constants.AuthConstants` in use, rebuilt when the domain changes.
         self.constants: Any
@@ -254,6 +266,23 @@ class AmazonAuthConfig:
             source = self._environment if "bs4_parser" in self._environment else self._data
             source["bs4_parser"] = "html.parser"
 
+    def _validate_account(self) -> None:
+        account = self.account
+        if not ACCOUNT_NAME_PATTERN.match(account):
+            raise AmazonAuthError(f"\"{account}\" isn't a name an account can have. An account's name is letters, "
+                                  "digits, \"-\" and \"_\".")
+        if account != DEFAULT_ACCOUNT and self._get("cookie_jar_path") != self._default_cookie_jar_path():
+            raise AmazonAuthError(f"The \"{account}\" account can't be used with the cookie_jar_path setting, since "
+                                  "every account's session would be kept in it. Leave it unset for each account to "
+                                  "have its own.")
+
+    def _has_cookie_jar(self,
+                        directory: str) -> bool:
+        root, extension = os.path.splitext(os.path.basename(self._default_cookie_jar_path()))
+        return os.path.isdir(directory) and any(
+            name == f"{root}{extension}" or (name.startswith(f"{root}.") and name.endswith(extension))
+            for name in os.listdir(directory))
+
     def _instantiate_constants(self) -> Any:
         constants_cls = self._load_configured_class("constants_class")
         # Pass ``self`` only when the constants class accepts a config arg, to keep backward
@@ -274,25 +303,80 @@ class AmazonAuthConfig:
         self._data["domain"] = domain
         self.constants = self._instantiate_constants()
 
+    def set_account(self,
+                    account: Optional[str]) -> None:
+        """
+        Set the active Amazon account, whose sessions are read and saved.
+
+        :param account: The account's name, or ``None`` for the ``default`` account.
+        :raises AmazonAuthError: If the name isn't one an account can have, or ``cookie_jar_path`` is set.
+        """
+        previous_account = self._data.get("account")
+        self._data["account"] = account
+        try:
+            self._validate_account()
+        except AmazonAuthError:
+            self._data["account"] = previous_account
+            raise
+
     @property
     def site(self) -> str:
         """The active Amazon site, the host of the ``domain`` without ``www.`` (e.g. ``amazon.de``)."""
         return (urlparse(self.constants.BASE_URL).hostname or "").removeprefix("www.")
 
     @property
+    def account(self) -> str:
+        """The active Amazon account's name, the ``account`` set (in lowercase), or else ``default``."""
+        account = self._get("account")
+        return DEFAULT_ACCOUNT if account in (None, "") else str(account).lower()
+
+    def accounts(self) -> List[str]:
+        """
+        Get the active account, then every other account with a saved session (a cookie jar) on any site, signed in
+        or not. With an explicit ``cookie_jar_path``, there's only the active account.
+
+        :return: The accounts' names.
+        """
+        accounts = [self.account]
+        default_cookie_jar_path = self._default_cookie_jar_path()
+        if self._get("cookie_jar_path") != default_cookie_jar_path:
+            return accounts
+
+        config_dir = os.path.dirname(default_cookie_jar_path)
+        account_dirs = {DEFAULT_ACCOUNT: config_dir}
+        accounts_dir = os.path.join(config_dir, ACCOUNTS_DIRECTORY)
+        if os.path.isdir(accounts_dir):
+            for name in sorted(os.listdir(accounts_dir)):
+                if name != DEFAULT_ACCOUNT and ACCOUNT_NAME_PATTERN.match(name):
+                    account_dirs[name] = os.path.join(accounts_dir, name)
+
+        for account, directory in account_dirs.items():
+            if account not in accounts and self._has_cookie_jar(directory):
+                accounts.append(account)
+
+        return accounts
+
+    @property
     def cookie_jar_path(self) -> str:
         """
-        The path the session for the active ``domain`` is persisted to, since each Amazon site has its own sign-in.
-        With the default ``cookie_jar_path``, the ``amazon.com`` session is kept there (``cookies.json``), and every
-        other site's beside it, named for the site (e.g. ``cookies.amazon.de.json``). Any other ``cookie_jar_path``
-        is used as-is, whatever the site.
+        The path the session for the active ``domain`` and ``account`` is persisted to, since each Amazon site and
+        account has its own sign-in. With the default ``cookie_jar_path``, the default account's ``amazon.com``
+        session is kept there (``cookies.json``), and every other site's beside it, named for the site (e.g.
+        ``cookies.amazon.de.json``). Each other account's are kept the same way, in a directory of their own (e.g.
+        ``accounts/spouse/cookies.json``). Any other ``cookie_jar_path`` is used as-is, whatever the site.
         """
         cookie_jar_path = self._get("cookie_jar_path")
-        if cookie_jar_path != self._default_cookie_jar_path() or self.site == DEFAULT_COOKIE_JAR_SITE:
+        if cookie_jar_path != self._default_cookie_jar_path():
             return cookie_jar_path
 
-        root, extension = os.path.splitext(cookie_jar_path)
-        return f"{root}.{self.site}{extension}"
+        directory, filename = os.path.split(cookie_jar_path)
+        if self.account != DEFAULT_ACCOUNT:
+            directory = os.path.join(directory, ACCOUNTS_DIRECTORY, self.account)
+        if self.site != DEFAULT_COOKIE_JAR_SITE:
+            root, extension = os.path.splitext(filename)
+            filename = f"{root}.{self.site}{extension}"
+
+        return os.path.join(directory, filename)
 
     @cookie_jar_path.setter
     def cookie_jar_path(self,
@@ -303,10 +387,11 @@ class AmazonAuthConfig:
     def shared_cookie_jar_path(self) -> Optional[str]:
         """
         The default ``cookie_jar_path``, which every site's session was persisted to before each site had its own,
-        when the active ``domain`` now has a jar of its own (see :attr:`cookie_jar_path`), otherwise ``None``.
+        when the active ``domain`` now has a jar of its own (see :attr:`cookie_jar_path`), otherwise ``None``. Only
+        the default account had sessions then, so it's always ``None`` for any other account.
         """
         shared_cookie_jar_path = self._get("cookie_jar_path")
-        if self.cookie_jar_path == shared_cookie_jar_path:
+        if self.account != DEFAULT_ACCOUNT or self.cookie_jar_path == shared_cookie_jar_path:
             return None
 
         return shared_cookie_jar_path
@@ -348,6 +433,7 @@ class AmazonAuthConfig:
         try:
             self._validate_bs4_parser()
             self._validate_class_paths()
+            self._validate_account()
             if key in ("constants_class", "selectors_class"):
                 module_path, class_name = self._class_path(key).rsplit(".", 1)
                 util.load_class(module_path.split("."), class_name)

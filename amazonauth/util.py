@@ -178,4 +178,10 @@ def make_private_dirs(path: str) -> None:
 
     :param path: The directory to create.
     """
-    os.makedirs(path, mode=0o700, exist_ok=True)
+    missing_dirs = []
+    while path and not os.path.isdir(path):
+        missing_dirs.append(path)
+        path = os.path.dirname(path)
+
+    for directory in reversed(missing_dirs):
+        os.makedirs(directory, mode=0o700, exist_ok=True)
