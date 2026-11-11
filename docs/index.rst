@@ -180,8 +180,8 @@ A ``domain`` can be any of these Amazon sites:
 
 .. supported-sites::
 
-Accounts
---------
+Multiple Accounts
+-----------------
 
 To use more than one Amazon account, like a partner's, give each other account a name with ``account`` in the
 :class:`config <amazonauth.conf.AmazonAuthConfig>` (e.g. ``spouse``). Each account keeps its own sessions, in a
