@@ -477,7 +477,7 @@ class AmazonSession:
             expires = cookie.get("expires")
             self.session.cookies.set(cookie["name"], cookie["value"], domain=cookie.get("domain", ""),
                                      path=cookie.get("path", "/"), secure=cookie.get("secure", False),
-                                     expires=int(expires) if expires and expires > 0 else None)
+                                     expires=int(expires) if expires is not None and expires >= 0 else None)
 
     def _load_shared_cookie_jar(self) -> None:
         """

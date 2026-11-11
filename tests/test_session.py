@@ -69,6 +69,16 @@ class TestSession(UnitTestCase):
             self.assertEqual(0o600, os.stat(self.test_config.cookie_jar_path).st_mode & 0o777)
 
     @responses.activate
+    def test_import_cookies_keeps_zero_expiry(self):
+        self.amazon_session.import_cookies(
+            [{"name": "expired", "value": "old", "domain": ".amazon.com", "expires": 0}], verify=False)
+        restored = AmazonSession(config=self.test_config)
+        self.assertEqual(0, next(iter(restored.session.cookies)).expires)
+        request = restored.session.prepare_request(requests.Request("GET", self.test_config.constants.BASE_URL))
+        self.assertNotIn("expired=old", request.headers.get("Cookie", ""))
+        self.assertEqual(0, len(responses.calls))
+
+    @responses.activate
     def test_import_cookies_verifies_by_default(self):
         check_response = self.given_session_check_page_exists()
         self.amazon_session._sign_in_required = True
