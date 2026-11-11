@@ -8,8 +8,8 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Added
 
-- Add a browser-child environment hook to `PlaywrightBrowserLogin`.
-- Add `AmazonSession.import_cookies()` with site filtering and optional verification.
+- `AmazonSession.import_cookies()`, to use the cookies of a browser signed in to Amazon.
+- `PlaywrightBrowserLogin.launch_env()`, to launch the sign-in browser with its own environment.
 
 ## [0.2.6](https://github.com/alexdlaird/amazon-auth/compare/0.2.5...0.2.6) - 2026-11-10
 

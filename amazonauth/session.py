@@ -365,12 +365,12 @@ class AmazonSession:
                        cookies: List[Dict[str, Any]],
                        verify: bool = True) -> None:
         """
-        Replace this session's cookies with the configured site's cookies and persist them using the normal jar
-        format and permissions. Accepts cookies as Playwright's ``BrowserContext.cookies()`` returns them.
+        Replace this session's cookies with the given ones for the configured site, and persist them. Accepts cookies
+        as Playwright's ``BrowserContext.cookies()`` returns them.
 
-        By default, ask Amazon whether it accepts the imported session before saving it. With ``verify=False``,
-        no request is made and ``is_authenticated`` remains ``False``. This replaces the in-memory session even if
-        verification fails; it does not provide isolated verification or a transaction with other jar writers.
+        By default, Amazon is asked whether it accepts the session, as :func:`check_session` does with ``verify``,
+        and ``is_authenticated`` is set to ``True`` if it does. If it doesn't, they still replace this session's
+        cookies, and may already have been saved. With ``verify=False``, no request is made.
 
         :param cookies: Cookies with name, value and domain, and optional path, secure and expires attributes.
         :param verify: Whether to verify the imported session with :func:`check_session`.

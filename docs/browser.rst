@@ -120,10 +120,8 @@ window is needed.
         def wait_for_sign_in(self, context, page, timeout):
             ...
 
-Override ``launch_env()`` to set variables only for the browser child. The default, ``None``, inherits the process
-environment. A mapping replaces that environment, including an empty mapping; copy ``os.environ`` to retain other
-variables. The Linux display check uses the same mapping. The parent process and Playwright driver keep their own
-environment.
+Override ``launch_env()`` to launch the browser with its own environment, like a different ``DISPLAY``. A mapping
+replaces this process's environment, so copy ``os.environ`` to keep the rest of it.
 
 .. code-block:: python
 
@@ -134,21 +132,19 @@ environment.
         def launch_env(self):
             return {**os.environ, "DISPLAY": ":42"}
 
-If a supported extra isn't working for you, please
-`open an issue <https://github.com/alexdlaird/amazon-auth/issues/new?assignees=&labels=bug&projects=&template=bug-report.yml>`_
-or a `pull request <https://github.com/alexdlaird/amazon-auth/compare>`_.
-
 Importing Cookies
 -----------------
 
-If sign-in happens in a browser you manage, pass its cookies to
+If sign-in happens in a browser of your own, pass its cookies to
 :meth:`~amazonauth.session.AmazonSession.import_cookies` rather than writing the cookie jar yourself:
 
 .. code-block:: python
 
     session.import_cookies(context.cookies())
 
-Only cookies for the configured site are kept. The default verifies the session with Amazon and raises if it is
-rejected. To defer verification to your first actual request, use ``verify=False``; this makes no requests and leaves
-``is_authenticated`` false. Imports replace the in-memory cookies, including on verification failure. Verification
-uses the normal session and does not isolate response cookie updates or provide a transaction with other writers.
+Only the configured site's cookies are kept, and Amazon is asked whether it accepts the session, raising if it
+doesn't. Pass ``verify=False`` to skip that request, leaving the first request you make to find out.
+
+If a supported extra isn't working for you, please
+`open an issue <https://github.com/alexdlaird/amazon-auth/issues/new?assignees=&labels=bug&projects=&template=bug-report.yml>`_
+or a `pull request <https://github.com/alexdlaird/amazon-auth/compare>`_.

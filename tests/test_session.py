@@ -40,6 +40,7 @@ class TestSession(UnitTestCase):
 
     @responses.activate
     def test_import_cookies_without_verification(self):
+        # GIVEN
         self.amazon_session.session.cookies.set("old", "stale", domain=".amazon.com")
         self.amazon_session.is_authenticated = True
         self.amazon_session._sign_in_required = True
@@ -52,8 +53,10 @@ class TestSession(UnitTestCase):
                    {"name": "prefix", "value": "ignored", "domain": "amazon.com.example.com"},
                    {"name": "hostless", "value": "ignored"}]
 
+        # WHEN
         self.amazon_session.import_cookies(cookies, verify=False)
 
+        # THEN
         self.assertEqual(0, len(responses.calls))
         self.assertFalse(self.amazon_session.is_authenticated)
         self.assertFalse(self.amazon_session._sign_in_required)
@@ -70,8 +73,11 @@ class TestSession(UnitTestCase):
 
     @responses.activate
     def test_import_cookies_keeps_zero_expiry(self):
+        # WHEN
         self.amazon_session.import_cookies(
             [{"name": "expired", "value": "old", "domain": ".amazon.com", "expires": 0}], verify=False)
+
+        # THEN
         restored = AmazonSession(config=self.test_config)
         self.assertEqual(0, next(iter(restored.session.cookies)).expires)
         request = restored.session.prepare_request(requests.Request("GET", self.test_config.constants.BASE_URL))
@@ -80,11 +86,14 @@ class TestSession(UnitTestCase):
 
     @responses.activate
     def test_import_cookies_verifies_by_default(self):
+        # GIVEN
         check_response = self.given_session_check_page_exists()
         self.amazon_session._sign_in_required = True
 
+        # WHEN
         self.amazon_session.import_cookies([{"name": "x-main", "value": "signed-in", "domain": ".amazon.com"}])
 
+        # THEN
         self.assertEqual(1, check_response.call_count)
         self.assertTrue(self.amazon_session.is_authenticated)
         self.assertFalse(self.amazon_session._sign_in_required)
@@ -92,36 +101,56 @@ class TestSession(UnitTestCase):
 
     @responses.activate
     def test_import_cookies_rejects_missing_auth_cookies(self):
+        # GIVEN
         self.amazon_session.is_authenticated = True
+
+        # WHEN
         with self.assertRaises(AmazonAuthSignInError):
             self.amazon_session.import_cookies([{"name": "x-main", "value": "foreign", "domain": ".amazon.de"}])
+
+        # THEN
         self.assertFalse(self.amazon_session.is_authenticated)
         self.assertEqual(0, len(responses.calls))
 
     @responses.activate
     def test_import_cookies_rejects_expired_session(self):
+        # GIVEN
         self.given_authenticated_url_redirects_to_login()
         self.given_login_responses_success()
         self.amazon_session.is_authenticated = True
+
+        # WHEN
         with self.assertRaises(AmazonAuthSignInError):
             self.amazon_session.import_cookies([{"name": "x-main", "value": "expired", "domain": ".amazon.com"}])
+
+        # THEN
         self.assertFalse(self.amazon_session.is_authenticated)
         self.assertTrue(self.amazon_session._sign_in_required)
 
     @responses.activate
     def test_import_cookies_propagates_verification_error(self):
+        # GIVEN
         self.given_session_check_page_exists(status=503)
         self.amazon_session.is_authenticated = True
+
+        # WHEN
         with self.assertRaises(AmazonAuthError):
             self.amazon_session.import_cookies([{"name": "x-main", "value": "session", "domain": ".amazon.com"}])
+
+        # THEN
         self.assertFalse(self.amazon_session.is_authenticated)
 
     @responses.activate
     def test_import_cookies_uses_configured_site(self):
+        # GIVEN
         config = AmazonAuthConfig(data={"domain": "amazon.de"})
         session = AmazonSession(config=config)
+
+        # WHEN
         session.import_cookies([{"name": "x-main", "value": "de", "domain": ".amazon.de"},
                                 {"name": "foreign", "value": "com", "domain": ".amazon.com"}], verify=False)
+
+        # THEN
         self.assertEqual({"x-main": "de"}, AmazonSession(config=config).session.cookies.get_dict())
         self.assertEqual(0, len(responses.calls))
 

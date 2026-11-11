@@ -40,17 +40,6 @@ SIGN_IN_SETTLE_MS = 2000
 SIGN_IN_PREFILL_TIMEOUT_MS = 5000
 
 
-def _jar_cookie_attributes(pw_cookie: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    The attributes of a browser cookie, as the session's cookie jar takes them. ``secure`` is kept, so a cookie only
-    sent over ``https`` in the browser is only sent over ``https`` by the session too.
-    """
-    expires = pw_cookie.get("expires", -1)
-    return {"domain": pw_cookie.get("domain"), "path": pw_cookie.get("path", "/"),
-            "secure": bool(pw_cookie.get("secure", False)),
-            "expires": int(expires) if expires and expires > 0 else None}
-
-
 class PlaywrightBrowserLauncher:
     """
     Launches the browser the config selects, from whatever Playwright supports. ``browser`` is either a browser that's
@@ -377,9 +366,7 @@ class PlaywrightAuthForm(AuthForm):
     def _harvest_cookies(self, context: Any) -> None:
         if not self.amazon_session:
             return  # pragma: no cover
-        for pw_cookie in context.cookies():
-            self.amazon_session.session.cookies.set(pw_cookie["name"], pw_cookie["value"],
-                                                    **_jar_cookie_attributes(pw_cookie))
+        self.amazon_session._load_cookie_jar_data(context.cookies())
 
     def _save_debug_snapshot(self, page: Any, output_dir: Optional[str], name: str) -> None:
         if not output_dir:
@@ -947,9 +934,8 @@ class PlaywrightBrowserLogin:
 
     def launch_env(self) -> Optional[Dict[str, str]]:
         """
-        Hook for the browser child's environment. ``None`` inherits the process environment. A supplied mapping
-        replaces it, so copy ``os.environ`` first if the browser should inherit other variables. The parent process
-        and Playwright driver environment are unchanged.
+        Hook for the environment to launch the browser with. By default, the browser inherits this process's. A
+        mapping replaces it, so copy ``os.environ`` first if the browser should inherit other variables.
 
         :return: The child's environment, or ``None`` to inherit it.
         """
@@ -1004,7 +990,7 @@ class PlaywrightBrowserLogin:
             logger.debug(f"Skipped pre-filling the username in the browser: {e}")
 
     def _require_display(self,
-                         env: Optional[Dict[str, str]] = None) -> None:
+                         env: Optional[Dict[str, str]]) -> None:
         if not self.headless and not has_display(env):
             raise AmazonAuthError("Signing in with a browser requires a display, and this machine doesn't have one.")
 
