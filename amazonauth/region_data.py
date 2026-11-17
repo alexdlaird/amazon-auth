@@ -43,7 +43,7 @@ REGION_SITES: Dict[str, RegionSite] = {
         english_locale='en_GB',
         language_cookie='lc-acbuk',
         assoc_handle='gbflex',
-        currency_symbol='£',
+        currency_symbol='USD',
     ),
     "co.za": RegionSite(
         english_locale='en_ZA',
