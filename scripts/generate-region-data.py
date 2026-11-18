@@ -127,11 +127,15 @@ def _with_retry(read, url, *args):
             time.sleep(RETRY_DELAY_SECONDS)
 
 
-def _read_listed_sites(url):
-    sites = sorted(set(COUNTRY_SELECTOR_SITE_REGEX.findall(_fetch(url).text)))
+def _read_country_selector(url):
+    response = _fetch(url)
+    sites = sorted(set(COUNTRY_SELECTOR_SITE_REGEX.findall(response.text)))
     if not sites:
         raise SiteUnreadableError(url, "lists no sites")
-    return sites
+    visitor_currency = _read_set_cookie(response, CURRENCY_COOKIE_REGEX)
+    if not visitor_currency:
+        raise SiteUnreadableError(url, f"set no {CURRENCY_COOKIE_NAME} cookie")
+    return sites, visitor_currency[0]
 
 
 def _read_set_cookie(response, cookie_regex):
@@ -192,7 +196,11 @@ def _currency_request_cookies(preferences, local_currency):
     return cookies
 
 
-def _read_currency_symbol(url, cookies):
+def _read_currency_symbol(url, cookies, visitor_currency):
+    """
+    Prices a site converted for the visitor are shown with the visitor's currency code (e.g. ``USD 7.54``), not a
+    symbol, so a symbol that's the visitor's currency code means the site's own currency wasn't what was read.
+    """
     symbols = Counter()
     for price in BESTSELLER_PRICE_REGEX.findall(_fetch(url, cookies).text):
         single_price = SINGLE_PRICE_REGEX.match(price.replace("\xa0", " ").strip())
@@ -204,7 +212,11 @@ def _read_currency_symbol(url, cookies):
     if len(symbols) != 1:
         raise SiteUnreadableError(url, f"shows prices in more than one currency ({dict(symbols)})")
 
-    return next(iter(symbols))
+    symbol = next(iter(symbols))
+    if symbol == visitor_currency:
+        raise SiteUnreadableError(url, f"shows prices converted to the visitor's currency ({visitor_currency})")
+
+    return symbol
 
 
 def _load_region_data_module():
@@ -254,7 +266,7 @@ def _build_report(changes, unreadable_sites):
     return "\n".join(sections) + "\n"
 
 
-def _read_site(tld, existing_site, unreadable_sites):
+def _read_site(tld, existing_site, visitor_currency, unreadable_sites):
     base_url = f"https://www.amazon.{tld}"
     try:
         preferences, local_currency = _with_retry(_read_preferences, f"{base_url}/customer-preferences/edit?ie=UTF8")
@@ -270,7 +282,7 @@ def _read_site(tld, existing_site, unreadable_sites):
     time.sleep(DELAY_BETWEEN_REQUESTS_SECONDS)
     try:
         currency_symbol = _with_retry(_read_currency_symbol, f"{base_url}/gp/bestsellers",
-                                      _currency_request_cookies(preferences, local_currency))
+                                      _currency_request_cookies(preferences, local_currency), visitor_currency)
     except SiteUnreadableError as e:
         unreadable_sites.append(f"- amazon.{tld}'s currency symbol: {e.reason}")
         currency_symbol = getattr(existing_site, "currency_symbol", None)
@@ -295,9 +307,9 @@ def generate_region_data(args):
     existing_sites = {tld: _as_region_site(site) for tld, site in _load_region_data_module().REGION_SITES.items()}
 
     try:
-        listed_sites = _with_retry(_read_listed_sites, COUNTRY_SELECTOR_URL)
+        listed_sites, visitor_currency = _with_retry(_read_country_selector, COUNTRY_SELECTOR_URL)
     except SiteUnreadableError as e:
-        print(f"Amazon's site list couldn't be read, so nothing was changed: {e}")
+        print(f"Amazon's country selector couldn't be read, so nothing was changed: {e}")
 
         sys.exit(1)
 
@@ -305,7 +317,7 @@ def generate_region_data(args):
     unreadable_sites = []
     for tld in listed_sites:
         time.sleep(DELAY_BETWEEN_REQUESTS_SECONDS)
-        region_site = _read_site(tld, existing_sites.get(tld), unreadable_sites)
+        region_site = _read_site(tld, existing_sites.get(tld), visitor_currency, unreadable_sites)
         if region_site:
             region_sites[tld] = region_site
 
