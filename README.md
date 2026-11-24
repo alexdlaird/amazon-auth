@@ -1,6 +1,7 @@
 <p align="center"><img alt="amazon-auth - Sign in to Amazon's consumer website from Python" src="https://amazon-auth.readthedocs.io/_images/logo.png" /></p>
 
 [![Version](https://img.shields.io/pypi/v/amazon-auth)](https://pypi.org/project/amazon-auth)
+[![PyPI - Downloads](https://img.shields.io/pypi/dm/amazon-auth)](https://pypistats.org/packages/amazon-auth)
 [![Python Versions](https://img.shields.io/pypi/pyversions/amazon-auth.svg)](https://pypi.org/project/amazon-auth)
 [![Coverage](https://img.shields.io/codecov/c/github/alexdlaird/amazon-auth)](https://codecov.io/gh/alexdlaird/amazon-auth)
 [![Build](https://img.shields.io/github/actions/workflow/status/alexdlaird/amazon-auth/build.yml)](https://github.com/alexdlaird/amazon-auth/actions/workflows/build.yml)
